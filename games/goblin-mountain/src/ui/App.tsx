@@ -1,0 +1,270 @@
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { ContentError, langFromLocale, newSeed, RuleError, Session, type Host, type Lang, type SaveData } from "@boardroom/core";
+import { LangProvider, Sheet, Toasts, useLang, useToasts, useWakeLock } from "@boardroom/ui";
+import { CARD_FOLDER, parseContent } from "../content";
+import { makeEngine, score, type Action, type Event, type Options, type State } from "../engine";
+import { messages } from "../messages";
+import { recordNote, recordPath } from "../record";
+import type { ContentPack } from "../types";
+import { Board, ManualSheet } from "./Board";
+import { feed } from "./text";
+import "./gm.css";
+
+type GmSession = Session<State, Action, Event, Options>;
+type GmSave = SaveData<Action, Options> & { finished?: boolean };
+
+const GAME = "goblin-mountain";
+const SAVE_DIR = "对局/存档";
+
+export function App(props: { host: Host }) {
+  const { host } = props;
+  const [lang, setLangState] = useState<Lang>(() => host.getSetting<Lang>("lang") ?? langFromLocale(host.locale()));
+  const setLang = (l: Lang) => {
+    setLangState(l);
+    void host.setSetting("lang", l);
+  };
+  return (
+    <LangProvider tables={messages} lang={lang} onChange={setLang}>
+      <div className="br-root gm-root">
+        <Game host={host} />
+      </div>
+    </LangProvider>
+  );
+}
+
+function Game({ host }: { host: Host }) {
+  const { t } = useLang();
+  const { toasts, push } = useToasts();
+  const [pack, setPack] = useState<ContentPack | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [latest, setLatest] = useState<GmSave | null>(null);
+  const [menu, setMenu] = useState<"none" | "menu" | "manual">("none");
+  const [savedPath, setSavedPath] = useState<string | null>(null);
+  const session = useRef<GmSession | null>(null);
+  const [, rerender] = useReducer((x: number) => x + 1, 0);
+  const tRef = useRef(t);
+  tRef.current = t;
+
+  useWakeLock(true);
+
+  const load = useCallback(async () => {
+    try {
+      const notes = await host.readNotes(CARD_FOLDER);
+      setPack(parseContent(notes));
+      setError(null);
+    } catch (e) {
+      if (e instanceof ContentError) setError(tRef.current("err.content", { detail: e.message }));
+      else setError(String(e));
+    }
+  }, [host]);
+
+  // Load content and find the last unfinished game.
+  useEffect(() => {
+    void load();
+    void findLatest(host).then(setLatest);
+    return host.onContentChange(() => {
+      void load();
+      if (session.current) push(tRef.current("toast.contentChanged"));
+    });
+  }, [host, load, push]);
+
+  const save = useCallback(
+    (finished = false) => {
+      const s = session.current;
+      if (!s) return;
+      const data: GmSave = { ...s.toSave(), finished };
+      void host.writeFile(savePath(data), JSON.stringify(data));
+    },
+    [host],
+  );
+
+  const start = (options: Options) => {
+    if (!pack) return;
+    session.current = new Session(makeEngine(pack), GAME, pack.hash, newSeed(), options);
+    setSavedPath(null);
+    save();
+    rerender();
+  };
+
+  const resume = (data: GmSave) => {
+    if (!pack) return;
+    const { session: s, stoppedAt } = Session.fromSave(makeEngine(pack), data);
+    session.current = s;
+    if (stoppedAt !== null) push(t("toast.replayStopped", { n: stoppedAt }), "bad");
+    setSavedPath(null);
+    rerender();
+  };
+
+  const act = (a: Action): boolean => {
+    const s = session.current;
+    if (!s) return false;
+    try {
+      const events = s.act(a);
+      for (const f of feed(events, t)) push(f.text, f.tone);
+      save(s.state.phase === "over");
+      rerender();
+      return true;
+    } catch (e) {
+      if (e instanceof RuleError) {
+        push(t(e.key, e.params), "bad");
+        return false;
+      }
+      throw e;
+    }
+  };
+
+  const undo = () => {
+    const s = session.current;
+    if (!s?.canUndo) return;
+    s.undo();
+    save();
+    push(t("toast.undone"));
+    rerender();
+  };
+
+  const abandon = () => {
+    save(true);
+    session.current = null;
+    setLatest(null);
+    setMenu("none");
+    rerender();
+  };
+
+  const writeRecord = async () => {
+    const s = session.current;
+    if (!s) return;
+    const path = recordPath(s.state, t);
+    await host.writeFile(path, recordNote(s.state, s.toSave(), t));
+    setSavedPath(path);
+  };
+
+  if (error) {
+    return (
+      <div className="gm-screen">
+        <h2>{t("game.title")}</h2>
+        <pre className="gm-error">{error}</pre>
+        {host.exit && <button className="br-btn" onClick={host.exit}>{t("menu.exit")}</button>}
+      </div>
+    );
+  }
+  if (!pack) return <div className="gm-screen">…</div>;
+
+  const s = session.current;
+  if (!s) {
+    return (
+      <div className="gm-screen gm-start">
+        <h1>{t("game.title")}</h1>
+        <div className="gm-muted">{t("game.subtitle")}</div>
+        {latest && !latest.finished && (
+          <button className="br-btn is-primary is-block" onClick={() => resume(latest)} data-testid="continue">
+            {t("start.continue")}
+          </button>
+        )}
+        <div className="gm-muted gm-gap">{t("start.pick")}</div>
+        {(["normal", "hard"] as const).map((d) => (
+          <button key={d} className="br-btn is-block" onClick={() => start({ difficulty: d })} data-testid={`new-${d}`}>
+            {t("start.new")} · {t(`difficulty.${d}`)}
+          </button>
+        ))}
+        <div className="gm-muted gm-gap">{t("start.rules")}</div>
+        {host.exit && <button className="br-btn is-quiet" onClick={host.exit}>{t("menu.exit")}</button>}
+        <Toasts toasts={toasts} />
+      </div>
+    );
+  }
+
+  const state = s.state;
+  const sc = state.phase === "over" ? score(state) : null;
+  return (
+    <>
+      <Board state={state} imageUrl={(p) => host.imageUrl(p)} act={act} canUndo={s.canUndo} undo={undo} openMenu={() => setMenu("menu")} exit={host.exit} />
+      {menu === "menu" && (
+        <MenuSheet onClose={() => setMenu("none")} canUndo={s.canUndo} undo={undo} manual={() => setMenu("manual")} restart={abandon} exit={host.exit} />
+      )}
+      {menu === "manual" && <ManualSheet s={state} act={act} onClose={() => setMenu("none")} />}
+      {sc && (
+        <div className="gm-over" data-testid="over">
+          <h1>{sc.won ? t("over.won") : t("over.lost")}</h1>
+          {sc.won ? (
+            <>
+              <div className="gm-rating">{t(`rating.${sc.rating}`)}</div>
+              <table className="gm-score">
+                <tbody>
+                  <tr><td>{t("over.fame")}</td><td>{sc.fame}</td></tr>
+                  <tr><td>{t("over.treasure")}</td><td>{sc.fromTreasure}</td></tr>
+                  <tr><td>{t("over.villagers")}</td><td>{sc.fromVillagers}</td></tr>
+                  <tr><td>{t("over.captured")}</td><td>{sc.fromCaptured}</td></tr>
+                  <tr className="gm-total"><td>{t("over.total")}</td><td data-testid="total">{sc.total}</td></tr>
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <p>{t("over.notCounted")}</p>
+          )}
+          {savedPath ? (
+            <div className="gm-muted">{t("over.saved", { path: savedPath })}</div>
+          ) : (
+            <button className="br-btn is-block" onClick={() => void writeRecord()} data-testid="record">
+              {t("over.save")}
+            </button>
+          )}
+          <button className="br-btn is-primary is-block" onClick={abandon} data-testid="again">
+            {t("over.again")}
+          </button>
+          <button className="br-btn is-quiet" disabled={!s.canUndo} onClick={undo}>
+            ↶ {t("menu.undo")}
+          </button>
+        </div>
+      )}
+      <Toasts toasts={toasts} />
+    </>
+  );
+}
+
+function MenuSheet(props: { onClose: () => void; canUndo: boolean; undo: () => void; manual: () => void; restart: () => void; exit?: () => void }) {
+  const { t, lang, setLang } = useLang();
+  return (
+    <Sheet title={t("menu.title")} onClose={props.onClose}>
+      <button className="br-btn is-block" disabled={!props.canUndo} onClick={props.undo}>
+        ↶ {t("menu.undo")}
+      </button>
+      <button className="br-btn is-block" onClick={props.manual} data-testid="manual">
+        {t("menu.manual")}
+      </button>
+      <button className="br-btn is-block" onClick={() => setLang(lang === "zh" ? "en" : "zh")} data-testid="lang">
+        {t("menu.lang")}
+      </button>
+      <button className="br-btn is-block" onClick={props.restart}>
+        {t("menu.restart")}
+      </button>
+      {props.exit && (
+        <button className="br-btn is-block" onClick={props.exit}>
+          {t("menu.exit")}
+        </button>
+      )}
+      <button className="br-btn is-quiet is-block" onClick={props.onClose}>
+        {t("menu.close")}
+      </button>
+    </Sheet>
+  );
+}
+
+function savePath(data: GmSave): string {
+  return `${SAVE_DIR}/${data.startedAt.replace(/[:.]/g, "-")}.json`;
+}
+
+/** The most recently updated save of this game, if any. */
+async function findLatest(host: Host): Promise<GmSave | null> {
+  let best: GmSave | null = null;
+  for (const path of await host.listFiles(SAVE_DIR)) {
+    if (!path.endsWith(".json")) continue;
+    try {
+      const data = JSON.parse((await host.readFile(path)) ?? "") as GmSave;
+      if (data.game !== GAME) continue;
+      if (!best || data.updatedAt > best.updatedAt) best = data;
+    } catch {
+      /* not a save */
+    }
+  }
+  return best;
+}
