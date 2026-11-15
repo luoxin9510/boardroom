@@ -1,7 +1,10 @@
 # boardroom
 
-Play the board games you own on your phone: a rules engine per game, a local server that reads the game's content from your own Obsidian vault, and a mobile-first web table.
+Play the board games you own on your phone, offline, inside Obsidian.
 
-The code is public. Game content (scans, card data, scenario layouts) is not: it lives only in your local vault and is never committed here.
+Each game is a TypeScript rules engine plus a mobile-first React UI, hosted by an Obsidian plugin. The game's content (card images, card data, rules notes) lives in your own vault and is never committed here; the repo only ships code and original test content.
 
-First game: Zombicide: Black Plague (core box). Status: design, see [docs/prd.md](docs/prd.md) (Chinese).
+- First game: Goblin Mountain (solo), a 9-card print-and-play game by Roman Flückiger. You need your own copy of the cards.
+- Status: design done, building M0. See [docs/prd.md](docs/prd.md) and [docs/games/](docs/games/) (Chinese).
+
+License: MIT (code only).
