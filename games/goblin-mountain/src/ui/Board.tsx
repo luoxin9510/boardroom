@@ -50,6 +50,9 @@ export function Board(props: BoardProps) {
   useEffect(() => setMode((m) => (m.k === "info" || m.k === "fate" ? m : { k: "idle" })), [s]);
 
   const artWidth = useArtWidth(s, props.imageUrl, trackRef);
+  /** Images that failed to load; those locations fall back to the text card. */
+  const [broken, setBroken] = useState<ReadonlySet<string>>(new Set());
+  const markBroken = (url: string) => setBroken((b) => (b.has(url) ? b : new Set(b).add(url)));
 
   const selected = mode.k === "selected" ? mode.color : null;
   const legal = useMemo(() => (selected ? targets(s, selected) : []), [s, selected]);
@@ -180,10 +183,12 @@ export function Board(props: BoardProps) {
           const d = dieAt(s, i);
           const layout = s.layout.find((l) => l.side === loc.side);
           const special = layout?.special ?? false;
-          const image = layout?.image ? props.imageUrl(`${CARD_FOLDER}/${layout.image}`) : null;
+          const url = layout?.image ? props.imageUrl(`${CARD_FOLDER}/${layout.image}`) : null;
+          // Art only once its size is known and it loads; otherwise the text card, so the location is always readable.
+          const image = url && artWidth && !broken.has(url) ? url : null;
           return (
             <Slot key={i} refKey={String(i)} refs={slotRefs} king={king === i} onTap={() => tapSlot(i)} glow={legal.includes(i)} special={special} cardStart={loc.index === 0} testId={`slot-${i}`} width={image ? artWidth : undefined}>
-              <Strip loc={loc} image={image} strips={layout?.strips} />
+              <Strip loc={loc} image={image} strips={layout?.strips} onError={() => url && markBroken(url)} />
               {image && <div className="gm-caption">{locName(loc, lang)}</div>}
               <div className="gm-slot-foot">
                 {d ? (
@@ -318,7 +323,7 @@ const STRIP_CHROME = 22 + 4 + 52 + 4 + 20 + 4 + 8 + 16; // king row, foot, capti
 function useArtWidth(s: State, imageUrl: (p: string) => string | null, trackRef: React.RefObject<HTMLDivElement>): { width: number; strip: number } | undefined {
   const [ratio, setRatio] = useState<number | null>(null);
   const [height, setHeight] = useState(0);
-  const first = s.layout.find((l) => l.image && !l.special);
+  const first = s.layout.find((l) => l.image && !l.special) ?? s.layout.find((l) => l.image);
   const url = first?.image ? imageUrl(`${CARD_FOLDER}/${first.image}`) : null;
   useEffect(() => {
     if (!url) return;
@@ -336,7 +341,7 @@ function useArtWidth(s: State, imageUrl: (p: string) => string | null, trackRef:
   }, [trackRef]);
   if (!ratio || !height) return undefined;
   // About three locations on screen: the width is capped, and the strip's height follows the card's proportions.
-  const room = Math.min(height, 560) - STRIP_CHROME;
+  const room = Math.max(120, Math.min(height, 560) - STRIP_CHROME);
   const width = Math.round(Math.max(96, Math.min(126, room * ratio + 8)));
   return { width, strip: Math.min(room, Math.round((width - 8) / ratio)) };
 }
@@ -373,7 +378,7 @@ function Slot(props: {
 }
 
 /** One location: its slice of the card art (or a plain panel), with name, requirement and effect on top. */
-function Strip(props: { loc: LocationDef; image: string | null; strips?: number[] }) {
+function Strip(props: { loc: LocationDef; image: string | null; strips?: number[]; onError?: () => void }) {
   const { t, lang } = useLang();
   const { loc } = props;
   const x = props.strips && props.strips.length === 5 ? props.strips : [0, 0.25, 0.5, 0.75, 1];
@@ -384,7 +389,7 @@ function Strip(props: { loc: LocationDef; image: string | null; strips?: number[
     // The card art already shows the name, requirement and reward; the caption below gives the name in the chosen language.
     return (
       <div className="gm-strip is-art">
-        <img src={props.image} alt={locName(loc, lang)} draggable={false} style={{ transform: `translateX(-${(a + f / 2) * 100}%)` }} />
+        <img src={props.image} alt={locName(loc, lang)} draggable={false} onError={props.onError} style={{ transform: `translateX(-${(a + f / 2) * 100}%)` }} />
       </div>
     );
   }

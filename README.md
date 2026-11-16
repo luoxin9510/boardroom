@@ -25,7 +25,7 @@ Each game is a TypeScript rules engine plus a mobile-first React UI, hosted by a
 npm install
 npm run check        # typecheck + unit tests + plugin build
 npm run dev          # browser host on http://localhost:5173 (also on your LAN), with the test cards
-BOARDROOM_VAULT="<path to vault>" npm run dev   # same, but reading a real vault's cards and images (read-only)
+BOARDROOM_VAULT="<path to vault>" npm run dev   # same, but reading a real vault's card notes and images (read-only; readable from your LAN while it runs)
 npx playwright install webkit && npm run e2e   # plays whole games at phone size
 ```
 

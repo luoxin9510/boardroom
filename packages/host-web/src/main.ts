@@ -7,6 +7,8 @@ import { mount } from "@boardroom/goblin-mountain/ui";
  */
 const notes = import.meta.glob("../../../fixtures/goblin-mountain/**/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 const ROOT = "../../../fixtures/goblin-mountain/";
+/** Fixture images (original placeholders), so the card-art path is exercised without a vault. */
+const images = import.meta.glob("../../../fixtures/goblin-mountain/**/*.png", { query: "?url", import: "default", eager: true }) as Record<string, string>;
 /** Set when the dev server was started with BOARDROOM_VAULT (see vite.config.ts). */
 const FROM_VAULT = Boolean(import.meta.env.VITE_VAULT);
 
@@ -41,7 +43,7 @@ const host: Host = {
       .map(([p, text]) => ({ path: p.slice(ROOT.length), text }))
       .filter((n) => n.path.startsWith(`${folder}/`));
   },
-  imageUrl: (path) => (FROM_VAULT ? `/vault-files/${path.split("/").map(encodeURIComponent).join("/")}` : null),
+  imageUrl: (path) => (FROM_VAULT ? `/vault-files/${path.split("/").map(encodeURIComponent).join("/")}` : images[ROOT + path] ?? null),
   async readFile(path) {
     return store.get(path);
   },
