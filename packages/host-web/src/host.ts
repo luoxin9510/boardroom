@@ -43,6 +43,9 @@ export function makeHost(pack: Pack, space: string, exit: () => void): { host: H
     async writeFile(path, text) {
       await store.put("files", key(path), text);
     },
+    async removeFile(path) {
+      await store.remove("files", key(path));
+    },
     async listFiles(folder) {
       const prefix = key(`${folder}/`);
       return (await store.entries<string>("files", prefix)).map(([k]) => k.slice(space.length + 1)).filter((p) => !p.slice(folder.length + 1).includes("/"));

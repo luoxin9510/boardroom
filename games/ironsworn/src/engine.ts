@@ -76,6 +76,8 @@ export interface Roll {
   harm: number;
   /** A consequence has been taken: no burning momentum after that (you can't take both results). */
   resolved: boolean;
+  /** Asset abilities already applied to this roll (by source key), so each is taken once. */
+  used?: string[];
 }
 
 export type Odds = "almostCertain" | "likely" | "fiftyFifty" | "unlikely" | "smallChance";
@@ -114,7 +116,7 @@ export type Action =
   | { t: "progressRoll"; move: string; track?: string; dice?: Dice }
   | { t: "burn" }
   /** Applies chosen consequences; `amounts` answers the "?" atoms in order; `track` is the progress track they mark. */
-  | { t: "effect"; atoms: Atom[]; amounts?: number[]; track?: string }
+  | { t: "effect"; atoms: Atom[]; amounts?: number[]; track?: string; /** "asset:<id>:<ability>" for an asset ability; omitted for the move's own result. */ source?: string }
   | { t: "endRoll" }
   /** Manual adjustment: always allowed, no rules applied (PRD decision 1). */
   | { t: "meter"; meter: Meter | "momentum"; delta: number }
@@ -334,6 +336,8 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
 
         case "effect": {
           const amounts = action.amounts ?? [];
+          if (action.source) need(!!s.pending && !(s.pending.used ?? []).includes(action.source), "err.applied");
+          if (action.atoms.some((a) => a.k === "harm")) need(!s.pending?.resolved, "err.applied");
           let ask = 0;
           const nextAmount = () => {
             const v = amounts[ask++];
@@ -396,7 +400,9 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
             }
           }
           // Taking a consequence settles the roll (raising harm first doesn't).
-          if (s.pending && !harmOnly) s.pending.resolved = true;
+          // An asset ability is taken on its own and doesn't settle the move's result.
+          if (s.pending && action.source) s.pending.used = [...(s.pending.used ?? []), action.source];
+          else if (s.pending && !harmOnly) s.pending.resolved = true;
           log({ k: "effect", atoms: action.atoms, amounts: resolved, track: usedTrack });
           break;
         }

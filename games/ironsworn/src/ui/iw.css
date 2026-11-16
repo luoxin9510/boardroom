@@ -1,0 +1,518 @@
+/* Ironsworn screens. Theme variables come from @boardroom/ui (.br-root). */
+.iw-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.iw-screen {
+  padding: calc(16px + var(--br-safe-top)) 16px calc(24px + var(--br-safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  height: 100%;
+}
+.iw-start h1 {
+  margin: 8px 0 0;
+  font-size: 30px;
+}
+.iw-muted {
+  color: var(--br-muted);
+}
+.iw-small {
+  font-size: 13px;
+}
+.iw-good {
+  color: var(--br-good);
+}
+.iw-bad {
+  color: var(--br-bad);
+}
+.iw-gap {
+  margin-top: 8px;
+}
+.iw-left {
+  justify-content: flex-start;
+  text-align: left;
+}
+.iw-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.iw-row > .iw-label {
+  flex: 1;
+}
+.iw-wrap {
+  flex-wrap: wrap;
+}
+.iw-label {
+  font-weight: 700;
+  margin-top: 12px;
+}
+.iw-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--br-line);
+  background: var(--br-panel-2);
+  color: var(--br-text);
+  font: inherit;
+  font-size: 16px;
+}
+.iw-select {
+  min-height: 44px;
+  border-radius: 10px;
+  background: var(--br-panel-2);
+  color: var(--br-text);
+  border: 1px solid var(--br-line);
+  font-size: 16px;
+  width: 100%;
+}
+.iw-new {
+  display: flex;
+  gap: 8px;
+}
+.iw-campaign {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: var(--br-panel);
+  border: 1px solid var(--br-line);
+  border-radius: var(--br-radius);
+  padding: 12px;
+}
+
+/* campaign view */
+.iw-campaign-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.iw-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: calc(4px + var(--br-safe-top)) 8px 4px;
+  background: var(--br-panel);
+  border-bottom: 1px solid var(--br-line);
+}
+.iw-title {
+  flex: 1;
+  font-weight: 800;
+  font-size: 17px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.br-root .iw-icon {
+  min-width: 44px;
+  font-size: 20px;
+}
+.iw-meters {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px;
+  background: var(--br-panel);
+  border-bottom: 1px solid var(--br-line);
+}
+.br-root .iw-meter {
+  appearance: none;
+  border: 1px solid var(--br-line);
+  background: var(--br-panel-2);
+  border-radius: 10px;
+  color: var(--br-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  font: inherit;
+  cursor: pointer;
+}
+.iw-meter b {
+  font-size: 22px;
+  line-height: 1.1;
+}
+.iw-meter span {
+  font-size: 12px;
+  color: var(--br-muted);
+}
+.iw-meter.is-momentum b {
+  color: var(--br-accent);
+}
+.iw-main {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.iw-tab {
+  padding: 8px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.iw-nav {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid var(--br-line);
+  background: var(--br-panel);
+  padding-bottom: var(--br-safe-bottom);
+}
+.br-root .iw-navbtn {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--br-muted);
+  font: inherit;
+  font-size: 15px;
+  min-height: 52px;
+  cursor: pointer;
+}
+.br-root .iw-navbtn.is-on {
+  color: var(--br-accent);
+  font-weight: 800;
+}
+.br-root .iw-pending {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(64px + var(--br-safe-bottom));
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--br-accent);
+  background: var(--br-panel-2);
+  color: var(--br-text);
+  font: inherit;
+  font-weight: 700;
+}
+
+/* pieces */
+.iw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.br-root .iw-chip {
+  appearance: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--br-line);
+  background: var(--br-panel-2);
+  color: var(--br-text);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  text-align: left;
+}
+.br-root .iw-chip.is-on {
+  border-color: var(--br-accent);
+  background: color-mix(in srgb, var(--br-accent) 22%, var(--br-panel-2));
+}
+.br-root .iw-chip.is-bad.is-on {
+  border-color: var(--br-bad);
+  background: color-mix(in srgb, var(--br-bad) 25%, var(--br-panel-2));
+}
+.iw-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.br-root .iw-stat {
+  appearance: none;
+  border: 1px solid var(--br-line);
+  background: var(--br-panel-2);
+  border-radius: 10px;
+  color: var(--br-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  font: inherit;
+}
+.iw-stat b {
+  font-size: 24px;
+}
+.iw-stat span {
+  font-size: 12px;
+  color: var(--br-muted);
+}
+.iw-debs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.iw-boxes {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+}
+.iw-box {
+  aspect-ratio: 1;
+  border: 1px solid var(--br-line);
+  border-radius: 4px;
+  background: var(--br-panel-2);
+}
+.iw-box.is-1 {
+  background: linear-gradient(135deg, transparent 45%, var(--br-accent) 45% 55%, transparent 55%), var(--br-panel-2);
+}
+.iw-box.is-2 {
+  background: linear-gradient(135deg, transparent 45%, var(--br-accent) 45% 55%, transparent 55%), linear-gradient(45deg, transparent 45%, var(--br-accent) 45% 55%, transparent 55%), var(--br-panel-2);
+}
+.iw-box.is-3 {
+  background: linear-gradient(135deg, transparent 45%, var(--br-accent) 45% 55%, transparent 55%), linear-gradient(45deg, transparent 45%, var(--br-accent) 45% 55%, transparent 55%), linear-gradient(90deg, transparent 45%, var(--br-accent) 45% 55%, transparent 55%), var(--br-panel-2);
+}
+.iw-box.is-4 {
+  background: var(--br-accent);
+}
+.iw-asset,
+.iw-track {
+  background: var(--br-panel);
+  border: 1px solid var(--br-line);
+  border-radius: var(--br-radius);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.iw-track.is-closed {
+  opacity: 0.6;
+}
+.iw-asset-head,
+.iw-track-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.iw-ability {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.iw-ability input,
+.iw-check input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 2px;
+}
+.iw-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.br-root .iw-pick {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--br-line);
+  background: var(--br-panel-2);
+  color: var(--br-text);
+  font: inherit;
+}
+.iw-movelist {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.br-root .iw-movebtn {
+  appearance: none;
+  min-height: 48px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--br-line);
+  background: var(--br-panel-2);
+  color: var(--br-text);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+}
+.iw-oracle-result {
+  background: var(--br-panel);
+  border: 1px solid var(--br-accent);
+  border-radius: var(--br-radius);
+  padding: 12px;
+  font-size: 17px;
+}
+.iw-journal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.iw-jentry {
+  font-size: 14px;
+  color: var(--br-muted);
+  border-left: 2px solid var(--br-line);
+  padding-left: 8px;
+}
+.iw-jentry.is-roll,
+.iw-jentry.is-oracle,
+.iw-jentry.is-ask {
+  color: var(--br-text);
+  border-left-color: var(--br-accent);
+}
+.iw-jnote {
+  margin: 4px 0;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+.iw-note-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* move sheet */
+.iw-move {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.iw-trigger {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.iw-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--br-line);
+  padding-top: 10px;
+}
+.iw-block p {
+  margin: 0;
+  line-height: 1.6;
+}
+.iw-related {
+  background: var(--br-panel-2);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.iw-dice-in {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.iw-dice-in label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.iw-dice-in input {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--br-line);
+  background: var(--br-panel-2);
+  color: var(--br-text);
+  font-size: 18px;
+  text-align: center;
+  width: 100%;
+}
+.iw-dice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.iw-die {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--br-panel-2);
+  border: 1px solid var(--br-line);
+  font-size: 20px;
+  font-weight: 800;
+}
+.iw-die small {
+  font-size: 10px;
+  color: var(--br-muted);
+  font-weight: 400;
+}
+.iw-die.is-action {
+  border-color: var(--br-accent);
+}
+.iw-score {
+  font-size: 16px;
+}
+.iw-vs {
+  color: var(--br-muted);
+}
+.iw-outcome {
+  font-size: 24px;
+  font-weight: 900;
+}
+.iw-outcome.is-strong {
+  color: var(--br-good);
+}
+.iw-outcome.is-weak {
+  color: var(--br-accent);
+}
+.iw-outcome.is-miss {
+  color: var(--br-bad);
+}
+.iw-match {
+  font-size: 16px;
+  color: var(--br-text);
+}
+.iw-eff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--br-panel-2);
+  border-radius: 10px;
+  padding: 10px;
+}
+.iw-eff-body {
+  line-height: 1.6;
+}
+.iw-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.iw-results summary {
+  color: var(--br-muted);
+  cursor: pointer;
+  min-height: 44px;
+  line-height: 44px;
+}
+.iw-results p {
+  line-height: 1.6;
+}
+
+.iw-namerow > .iw-label {
+  flex: none;
+  margin-top: 0;
+}
+
+.iw-main.has-pending .iw-tab {
+  padding-bottom: 88px;
+}
+.br-root .iw-chip.is-disabled {
+  opacity: 0.6;
+}
