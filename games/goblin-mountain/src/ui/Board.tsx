@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Sheet, Stepper, useLang } from "@boardroom/ui";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { RichText, Sheet, Stepper, useLang } from "@boardroom/ui";
+import type { CoachView } from "../tutorial";
 import {
   active,
   canAct,
@@ -27,6 +28,10 @@ export interface BoardProps {
   undo: () => void;
   openMenu: () => void;
   exit?: () => void;
+  /** Opens the rules page, at a topic if given. */
+  openRules: (topic?: string) => void;
+  /** The tutorial overlay, given what the board shows right now. */
+  coach?: (view: CoachView) => ReactNode;
 }
 
 type Mode =
@@ -144,8 +149,8 @@ export function Board(props: BoardProps) {
           <div className="gm-king">
             <span className="gm-crown">♛</span> {kingLabel} · <span className="gm-muted">{t("king.next", { n: kingSteps(s) })}</span>
           </div>
-          <div className="gm-stealth" aria-label={t("stealth.label")}>
-            <span className="gm-muted">{t("stealth.label")}</span>
+          <div className="gm-stealth" aria-label={t("stealth.label")} onClick={() => props.openRules("stealth")}>
+            <span className="gm-muted gm-underline">{t("stealth.label")}</span>
             {COLORS.map((c) => (
               <span key={c} className={`gm-mini is-${c}${s.stealth[c] === null ? " is-gone" : ""}`}>
                 {s.stealth[c] ?? "·"}
@@ -220,7 +225,7 @@ export function Board(props: BoardProps) {
       </div>
 
       <div className="gm-hint" data-testid="hint">
-        {hint}
+        <RichText text={hint} onTopic={props.openRules} />
       </div>
 
       <footer className="gm-panel">
@@ -273,7 +278,7 @@ export function Board(props: BoardProps) {
 
       {s.phase === "action" && <ActionSheet s={s} act={act} canUndo={props.canUndo} undo={props.undo} />}
       {s.phase === "kingHit" && (
-        <Sheet title={t("hint.kingHit")}>
+        <Sheet title={<RichText text={t("hint.kingHit")} onTopic={props.openRules} />}>
           <div className="gm-row">
             {COLORS.filter((c) => {
               const p = s.dice[c].pos;
@@ -289,6 +294,9 @@ export function Board(props: BoardProps) {
       )}
       {mode.k === "fate" && (
         <Sheet title={t("fate.title", { n: s.fate })} onClose={() => setMode({ k: "idle" })}>
+          <button className="br-btn is-quiet gm-left" onClick={() => props.openRules("fate")} data-testid="rules-fate">
+            📖 {t("rules.fate")}
+          </button>
           {(["swap", "plus", "minus", "set4", "stealth1"] as FateKind[]).map((kind) => (
             <button
               key={kind}
@@ -304,6 +312,7 @@ export function Board(props: BoardProps) {
           ))}
         </Sheet>
       )}
+      {props.coach?.({ state: s, selected })}
       {mode.k === "info" && (
         <Sheet title={locName(mode.loc, lang)} onClose={() => setMode({ k: "idle" })}>
           <div className="gm-info-req">
@@ -311,6 +320,9 @@ export function Board(props: BoardProps) {
           </div>
           <div>{locationSummary(mode.loc, t)}</div>
           <div className="gm-muted">{lang === "zh" ? mode.loc.en : mode.loc.zh}</div>
+          <button className="br-btn is-quiet gm-left" onClick={() => props.openRules("actions")} data-testid="rules-actions">
+            📖 {t("rules.actions")}
+          </button>
         </Sheet>
       )}
     </div>
