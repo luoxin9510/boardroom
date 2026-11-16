@@ -404,3 +404,16 @@ describe("saves from before the bonus field", () => {
     expect(fellBack).toBeNull();
   });
 });
+
+describe("world truths", () => {
+  it("records a picked or rolled row and logs it", () => {
+    const c = campaign();
+    c.act({ t: "truth", truth: "old-age", row: 2 });
+    expect(c.state.truths).toEqual({ "old-age": 2 });
+    c.act({ t: "truth", truth: "old-age", dice: 50 });
+    expect(c.state.truths).toEqual({ "old-age": 1 });
+    expect(c.journal.at(-1)).toMatchObject({ k: "truth", id: "old-age", roll: 50 });
+    expect(() => c.act({ t: "truth", truth: "nope" })).toThrow(RuleError);
+    expect(() => c.act({ t: "truth", truth: "old-age", row: 5 })).toThrow(RuleError);
+  });
+});

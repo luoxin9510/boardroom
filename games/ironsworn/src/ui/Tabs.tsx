@@ -20,7 +20,7 @@ export function Boxes(props: { ticks: number }) {
 
 // ---------- 角色 ----------
 
-export function CharacterTab(props: { state: State; pack: ContentPack; act: Act }) {
+export function CharacterTab(props: { state: State; pack: ContentPack; act: Act; openRules?: (topic: string) => void }) {
   const { t, lang } = useLang();
   const c = props.state.character;
   const [statEdit, setStatEdit] = useState<string | null>(null);
@@ -47,7 +47,14 @@ export function CharacterTab(props: { state: State; pack: ContentPack; act: Act 
         ))}
       </div>
 
-      <div className="iw-label">{t("char.debilities")}</div>
+      <div className="iw-row">
+        <span className="iw-label">{t("char.debilities")}</span>
+        {props.openRules && (
+          <button className="br-btn is-quiet" onClick={() => props.openRules?.("debilities")} data-testid="deb-rules">
+            {t("rules.link")}
+          </button>
+        )}
+      </div>
       {groups.map(([g, ids]) => (
         <div key={g} className="iw-debs">
           <span className="iw-muted iw-small">{t(`deb.${g}`)}</span>
@@ -121,6 +128,19 @@ export function CharacterTab(props: { state: State; pack: ContentPack; act: Act 
         );
       })}
 
+      {props.state.truths && Object.keys(props.state.truths).length > 0 && (
+        <details className="iw-results" data-testid="char-truths">
+          <summary>{t("char.truths")}</summary>
+          {props.pack.truths
+            .filter((tr) => props.state.truths?.[tr.id] !== undefined)
+            .map((tr) => (
+              <p key={tr.id}>
+                <b>{pick(tr.name, lang)}</b>：{pick(tr.rows[props.state.truths?.[tr.id] as number]?.text, lang)}
+              </p>
+            ))}
+        </details>
+      )}
+
       {statEdit && (
         <Sheet title={t(`stat.${statEdit}`)} onClose={() => setStatEdit(null)}>
           <Stepper label={t(`stat.${statEdit}`)} value={c.stats[statEdit as "edge"]} min={0} max={4} onChange={(v) => props.act({ t: "stat", stat: statEdit as "edge", value: v })} />
@@ -137,7 +157,7 @@ function NameInput(props: { value: string; onCommit: (v: string) => void }) {
   return <input className="iw-input" value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== props.value && props.onCommit(v)} data-testid="char-name" />;
 }
 
-function AssetPicker(props: { pack: ContentPack; state: State; act: Act; onClose: () => void }) {
+export function AssetPicker(props: { pack: ContentPack; state: State; act: Act; onClose: () => void }) {
   const { t, lang } = useLang();
   const [cat, setCat] = useState<Asset["category"] | "all">("all");
   const [free, setFree] = useState(props.state.character.assets.length < 3);
@@ -400,7 +420,7 @@ function NoteInput(props: { addNote: (text: string) => void; exportIt: () => voi
 
 // ---------- 顶部资源条 ----------
 
-export function MetersBar(props: { state: State; act: Act }) {
+export function MetersBar(props: { state: State; act: Act; openRules?: (topic: string) => void }) {
   const { t } = useLang();
   const c = props.state.character;
   const [edit, setEdit] = useState<"health" | "spirit" | "supply" | "momentum" | null>(null);
@@ -417,6 +437,18 @@ export function MetersBar(props: { state: State; act: Act }) {
         <Sheet title={t(`meter.${edit}`)} onClose={() => setEdit(null)}>
           <Stepper label={t(`meter.${edit}`)} value={value(edit)} min={edit === "momentum" ? -6 : 0} max={edit === "momentum" ? momentumMax(c) : 5} onChange={(v) => props.act({ t: "meter", meter: edit, delta: v - value(edit) })} />
           {edit === "momentum" && <div className="iw-muted iw-small">{t("momentum.detail", { max: momentumMax(c), reset: momentumReset(c) })}</div>}
+          {props.openRules && (
+            <button
+              className="br-btn is-quiet iw-rulelink"
+              onClick={() => {
+                setEdit(null);
+                props.openRules?.(edit === "momentum" ? "momentum" : "debilities");
+              }}
+              data-testid="meter-rules"
+            >
+              {t("rules.link")}
+            </button>
+          )}
           {edit !== "momentum" && <div className="iw-muted iw-small">{DEBILITIES.filter((d) => c.debilities.includes(d)).map((d) => t(`deb.${d}`)).join(" · ")}</div>}
         </Sheet>
       )}

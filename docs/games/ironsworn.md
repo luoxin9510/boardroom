@@ -81,7 +81,7 @@ When you attempt something risky……（英文全文）
 - **资产**（`资产/猎犬.md`）：frontmatter `type: asset`、`id`、`category: companion|path|combat|ritual`、`zh`、`en`、可选 `health: 4`（伙伴生命条，伙伴受伤走「伙伴忍受伤害」动作）、可选 `field: 名字`（伙伴名等要玩家填的栏）；正文一张表：`| 序号 | 中文 | English | 默认 | 后果 |`，三条能力，`默认` 打 ✓ 的是起始就有的；`后果` 可选，写了的能力在相关动作的面板里多一个按钮（如 `harm+1`、`momentum+1`），只是方便，仍由玩家决定点不点。
 - **先知**（`先知/行动.md`）：frontmatter `type: oracle`、`id`、`group`（核心／地点／人物／剧情／地下城……）、`zh`、`en`、`dice: d100`、`source`；正文一张表 `| 范围 | 中文 | English |`，范围写 `1-2`、`3`、`99-100`。
 - **真相**（`真相/旧世界.md`）：frontmatter `type: truth`、`id`、`zh`、`en`；表 `| 范围 | 中文 | English | 任务种子 |`。
-- 规则页沿用哥布林山脉的格式（`type: rules`、`lang`、`<!-- topic: id -->`）。动作卡本身带原文全文，规则页链接用于章节级概念，必需的 topic：`action-roll` `momentum` `progress` `debilities` `vows` `combat` `journey` `oracles` `experience`。
+- 规则页沿用哥布林山脉的格式（`type: rules`、`lang`、`<!-- topic: id -->`）。动作卡本身带原文全文，规则页链接用于章节级概念，必需的 topic：`action-roll` `momentum` `progress` `debilities` `vows` `combat` `journey` `oracles` `experience` `bonds` `assets` `truths`。
 - 打包：`npm run pack` 打 `boardroom.json` 里 `folders` 列出的文件夹（铁誓：`{"game": "ironsworn", "folders": ["动作", "资产", "先知", "真相", "规则"]}`；不写时是哥布林山脉的 `卡牌`、`规则`），永远不打 `战役/`、`对局/`。
 - 解析器报错指出文件、行、列和正确写法。中文、英文缺一个时界面回退到另一种语言。
 
@@ -128,6 +128,16 @@ When you attempt something risky……（英文全文）
 - **验收**：作者在手机上导入后，动作、资产、先知齐全，抽查无误。
 
 ### M3：建角向导 + 规则链接 + 新手引导
+
+做法：新建战役后自动打开向导（`ui/Wizard.tsx`），⋯ 菜单里「建角向导」可以重开。各步骤：
+1. 世界真相：每条选一项或掷 d100，记进状态 `truths` 和日志，选中后显示任务种子；角色页可以查看。
+2. 属性：按 3/2/2/1/1 分配，先点属性再点数值，可以重新分配。
+3. 三张免费资源。
+4. 纽带：0–3 划。
+5. 背景誓言：默认史诗。
+6. 开场誓言：默认危险，立好后可直接跳到「立下铁誓」。
+
+每步都有 📖 规则链接。行动面板、气势和衰弱也有规则链接：按行动的类别或进度条种类，跳到规则页对应的 topic，新增了 `bonds`、`assets`、`truths` 三个 topic。第一次打开铁誓时显示三段「怎么玩」，看过就不再显示（设置项 `iw.intro`）。
 - 建角向导；动作卡、提示里的规则链接；第一次进来的简短引导。
 - **验收**：作者从零建一个角色开一局。
 

@@ -50,3 +50,18 @@ Ask yes or no, or roll a table for inspiration.
 <!-- topic: experience -->
 
 Keep promises to earn experience; spend it on assets and upgrades.
+
+## Bonds
+<!-- topic: bonds -->
+
+Ties to people and places. Each new bond marks one tick.
+
+## Assets
+<!-- topic: assets -->
+
+Pick three assets for free at creation; buy more with experience later.
+
+## World truths
+<!-- topic: truths -->
+
+Before play, set a few facts about the world: pick an option for each, or roll.
