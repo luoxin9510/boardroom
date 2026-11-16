@@ -574,6 +574,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           if (i === undefined) {
             roll = die(s, 100, action.dice);
             i = tr.rows.findIndex((r) => (roll as number) >= r.from && (roll as number) <= r.to);
+            need(i >= 0, "err.truthGap", { roll, id: tr.id });
           }
           const row = tr.rows[i];
           need(Number.isInteger(i) && row, "err.unknownTruth", { id: action.truth });

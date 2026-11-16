@@ -23,6 +23,9 @@ export function Wizard(props: {
   const { t, lang } = useLang();
   const steps: Step[] = [...(props.pack.truths.length ? (["truths"] as const) : []), "stats", "assets", "bonds", "background", "inciting"];
   const [i, setI] = useState(0);
+  // Vows made in this run of the wizard, kept here so stepping back and forth doesn't offer to make them again.
+  const [made, setMade] = useState<Record<string, string>>({});
+  const vowProps = (k: string) => ({ made: made[k] ?? null, onMade: (name: string) => setMade((m) => ({ ...m, [k]: name })) });
   const step = steps[i] as Step;
   const last = i === steps.length - 1;
   const topic: Record<Step, string> = { truths: "truths", stats: "action-roll", assets: "assets", bonds: "bonds", background: "vows", inciting: "vows" };
@@ -42,10 +45,10 @@ export function Wizard(props: {
         {step === "stats" && <Stats {...props} />}
         {step === "assets" && <Assets {...props} />}
         {step === "bonds" && <Bonds {...props} />}
-        {step === "background" && <Vow key="bg" {...props} hint="wiz.backgroundHint" rank="epic" />}
+        {step === "background" && <Vow key="bg" {...props} {...vowProps("bg")} hint="wiz.backgroundHint" rank="epic" />}
         {step === "inciting" && (
           <>
-            <Vow key="inc" {...props} hint="wiz.incitingHint" rank="dangerous" />
+            <Vow key="inc" {...props} {...vowProps("inc")} hint="wiz.incitingHint" rank="dangerous" />
             {swear && (
               <button
                 className="br-btn is-block"
@@ -109,17 +112,22 @@ function Truths(props: P) {
 function Stats(props: P) {
   const { t } = useLang();
   const c = props.state.character;
-  // Values already handed out, read from the sheet so the step resumes where it was left.
+  // Values already handed out, read from the sheet so the step resumes where it was left. If they aren't a part of
+  // 3/2/2/1/1 (set by hand on the character tab), only "start over" is offered.
   const given = STATS.map((s) => c.stats[s]).filter((v) => v > 0);
   const left = [...POOL];
+  let fits = true;
   for (const v of given) {
     const k = left.indexOf(v);
     if (k >= 0) left.splice(k, 1);
+    else fits = false;
   }
+  if (!fits) left.length = 0;
   const [sel, setSel] = useState<Stat | null>(null);
   return (
     <>
       <p className="iw-muted iw-small">{t("wiz.statsHint")}</p>
+      {!fits && <p className="iw-bad iw-small">{t("wiz.statsOff")}</p>}
       <div className="iw-stats">
         {STATS.map((s) => (
           <button key={s} className={`iw-stat${sel === s ? " is-on" : ""}`} onClick={() => setSel(s)} data-testid={`wiz-stat-${s}`}>
@@ -188,11 +196,11 @@ function Bonds(props: P) {
   );
 }
 
-function Vow(props: P & { hint: string; rank: Rank }) {
+function Vow(props: P & { hint: string; rank: Rank; made: string | null; onMade: (name: string) => void }) {
   const { t } = useLang();
   const [name, setName] = useState("");
   const [rank, setRank] = useState<Rank>(props.rank);
-  const [made, setMade] = useState<string | null>(null);
+  const made = props.made;
   return (
     <>
       <p className="iw-muted iw-small">{t(props.hint)}</p>
@@ -214,7 +222,7 @@ function Vow(props: P & { hint: string; rank: Rank }) {
             className="br-btn is-primary is-block"
             disabled={!name.trim()}
             onClick={() => {
-              if (props.act({ t: "newTrack", kind: "vow", name: name.trim(), rank })) setMade(name.trim());
+              if (props.act({ t: "newTrack", kind: "vow", name: name.trim(), rank })) props.onMade(name.trim());
             }}
             data-testid="wiz-vow-create"
           >

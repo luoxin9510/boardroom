@@ -222,10 +222,14 @@ test("first visit: how to play, then create a character with the wizard", async 
   await page.getByTestId("intro-ok").tap();
   await page.getByTestId("new-name").fill("卡拉");
   await page.getByTestId("new-campaign").tap();
-  // 1 world truths: pick one, roll another
+  // 1 world truths
   await expect(page.getByTestId("wiz-truths")).toBeVisible();
   await page.getByTestId("truth-old-age-1").tap();
   await expect(page.getByTestId("truth-old-age")).toContainText("找到解药的配方");
+  await page.getByTestId("wiz-next").tap();
+  // going back and forth keeps what was chosen
+  await page.getByTestId("wiz-back").tap();
+  await expect(page.getByTestId("truth-old-age-1")).toHaveClass(/is-on/);
   await page.getByTestId("wiz-next").tap();
   // 2 stats 3/2/2/1/1
   for (const [s, v] of [["iron", 3], ["edge", 2], ["heart", 2], ["wits", 1], ["shadow", 1]] as const) {
@@ -250,6 +254,9 @@ test("first visit: how to play, then create a character with the wizard", async 
   // 5 background vow
   await page.getByTestId("wiz-vow-name").fill("为故乡复仇");
   await page.getByTestId("wiz-vow-create").tap();
+  await expect(page.getByTestId("wiz-vow-made")).toBeVisible();
+  await page.getByTestId("wiz-back").tap();
+  await page.getByTestId("wiz-next").tap();
   await expect(page.getByTestId("wiz-vow-made")).toBeVisible();
   await page.getByTestId("wiz-next").tap();
   // 6 inciting incident, then go swear it

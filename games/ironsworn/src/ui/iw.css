@@ -532,7 +532,7 @@
   position: sticky;
   bottom: 0;
   background: var(--br-panel);
-  padding: 8px 0 calc(4px + var(--br-safe-bottom));
+  padding: 8px 0 4px;
 }
 .iw-truth {
   display: flex;
