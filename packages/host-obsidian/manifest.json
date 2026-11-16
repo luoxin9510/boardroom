@@ -1,0 +1,10 @@
+{
+  "id": "boardroom",
+  "name": "Boardroom",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Play the board games you own, offline, on your phone. Card data and images come from your vault.",
+  "author": "luoxin9510",
+  "authorUrl": "https://github.com/luoxin9510/boardroom",
+  "isDesktopOnly": false
+}

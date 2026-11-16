@@ -1,0 +1,13 @@
+/* Boardroom: hide Obsidian's chrome while the game is the active view. */
+body.boardroom-immersive .workspace-leaf-content[data-type="boardroom-game"] .view-header,
+body.boardroom-immersive .mobile-navbar,
+body.boardroom-immersive .mobile-toolbar {
+  display: none !important;
+}
+.workspace-leaf-content[data-type="boardroom-game"] .view-content.boardroom-view {
+  padding: 0 !important;
+  overflow: hidden;
+}
+.boardroom-mount {
+  height: 100%;
+}
