@@ -22,8 +22,9 @@ export const useArt = () => useContext(Ctx);
 /** Looks an image up by its name without extension. */
 export function artFrom(imageUrl: (path: string) => string | null): Art {
   return (name) => {
+    // Photos from phones and cameras often have upper-case extensions (.JPG).
     for (const ext of ["jpg", "jpeg", "png", "webp"]) {
-      const url = imageUrl(`${ART_FOLDER}/${name}.${ext}`);
+      const url = imageUrl(`${ART_FOLDER}/${name}.${ext}`) ?? imageUrl(`${ART_FOLDER}/${name}.${ext.toUpperCase()}`);
       if (url) return url;
     }
     return null;
@@ -37,7 +38,7 @@ export function Banner(props: { name: string; title?: ReactNode; tall?: boolean;
   return (
     <div className={`iw-banner${props.tall ? " is-tall" : ""}`} data-testid={props.testid ?? `banner-${props.name}`}>
       <img src={url} alt="" />
-      {props.title && <div className="iw-banner-title">{props.title}</div>}
+      {props.title && <h1 className="iw-banner-title">{props.title}</h1>}
     </div>
   );
 }

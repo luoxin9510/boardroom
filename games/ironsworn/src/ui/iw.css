@@ -637,6 +637,7 @@ img.iw-portrait.is-small {
   background: linear-gradient(to bottom, transparent 35%, var(--br-bg) 100%);
 }
 .iw-banner-title {
+  margin: 0;
   position: absolute;
   left: 16px;
   right: 16px;
