@@ -128,7 +128,7 @@ export class Campaign<S, A, E> {
     const print = (s: S) => (engine.fingerprint ? engine.fingerprint(s) : JSON.stringify(s));
     const fallback = (why: "failed" | "differs") => {
       const c = new Campaign(engine, save.game, save.id, save.title, save.state, save.startedAt, window);
-      c.entries = save.journal.slice();
+      c.entries = (save.journal ?? []).slice();
       return { campaign: c, fellBack: why };
     };
     const c = new Campaign(engine, save.game, save.id, save.title, save.base, save.startedAt, window);
@@ -139,8 +139,8 @@ export class Campaign<S, A, E> {
     }
     if (print(c.state) !== print(save.state)) return fallback("differs");
     // The replayed events are the same actions' events; keep the saved journal (it has the older history too).
-    c.entries = save.journal.slice();
-    c.marks = save.marks.slice();
+    c.entries = (save.journal ?? []).slice();
+    c.marks = save.marks?.length === save.actions.length ? save.marks.slice() : save.actions.map(() => c.entries.length);
     c.lastEvents = [];
     return { campaign: c, fellBack: null };
   }

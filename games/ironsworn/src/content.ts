@@ -180,7 +180,7 @@ export function parseContent(notes: Raw[]): ContentPack {
     if (!raw.path.endsWith(".md")) continue;
     const n = parseNote(raw.path, raw.text);
     const type = str(n, "type");
-    const expected = TYPE_OF_FOLDER[raw.path.split("/").at(-2) ?? ""];
+    const expected = raw.path.split("/").slice(0, -1).map((f) => TYPE_OF_FOLDER[f]).find(Boolean);
     if (expected && type !== expected) throw new ContentError(n.file, 1, `notes in this folder need "type: ${expected}" in the frontmatter${type ? `, not "${type}"` : ""}`);
     if (type === "move") pack.moves.push(parseMove(raw, n));
     else if (type === "asset") pack.assets.push(parseAsset(n));

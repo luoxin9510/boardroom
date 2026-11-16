@@ -347,7 +347,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
             return t;
           };
           const resolved: number[] = [];
-          const harmOnly = action.atoms.every((a) => a.k === "harm");
+          const harmOnly = action.atoms.length > 0 && action.atoms.every((a) => a.k === "harm");
           for (const a of action.atoms) {
             switch (a.k) {
               case "meter": {
