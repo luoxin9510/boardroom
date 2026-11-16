@@ -329,3 +329,16 @@ describe("messages", () => {
     for (const m of src.matchAll(/"((?:err|prompt)\.[a-zA-Z]+)"/g)) expect(messages.zh, m[1]).toHaveProperty([m[1] as string]);
   });
 });
+
+describe("asset abilities on a roll", () => {
+  it("are taken once each and don't settle the move's own result", () => {
+    const c = campaign();
+    c.act({ t: "roll", move: "probe", stat: "edge", dice: { d6: 6, c1: 1, c2: 2 } });
+    c.act({ t: "effect", atoms: [{ k: "meter", meter: "momentum", delta: 1 }], source: "asset:lantern-moth:0" });
+    expect(c.state.pending?.resolved).toBe(false);
+    expect(() => c.act({ t: "effect", atoms: [{ k: "meter", meter: "momentum", delta: 1 }], source: "asset:lantern-moth:0" })).toThrow();
+    c.act({ t: "effect", atoms: [{ k: "meter", meter: "momentum", delta: 2 }] });
+    expect(c.state.pending?.resolved).toBe(true);
+    expect(() => c.act({ t: "effect", atoms: [{ k: "harm", n: 1 }] })).toThrow();
+  });
+});

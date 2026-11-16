@@ -27,10 +27,11 @@ export function MoveSheet(props: {
   const pending = state.pending && state.pending.move === move.id ? state.pending : null;
 
   const apply = (atoms: Atom[], amounts: number[], tr?: string) => props.act({ t: "effect", atoms, amounts, track: tr });
+  const applyFrom = (source: string) => (atoms: Atom[], amounts: number[], tr?: string) => props.act({ t: "effect", atoms, amounts, track: tr, source });
   // Combat moves mark the foe's (combat) track; progress moves their own kind.
   const kind = move.track && move.track !== "bonds" ? move.track : move.category === "combat" ? "combat" : undefined;
-  const consequence = (src: string, testid: string, done?: boolean) => (
-    <Consequence key={`${move.id}:${testid}:${src}`} src={src} state={state} pack={props.pack} apply={apply} openMove={props.openMove} rollOracle={props.rollOracle} kind={kind} done={done} testid={testid} />
+  const consequence = (src: string, testid: string, done?: boolean, source?: string) => (
+    <Consequence key={`${move.id}:${testid}:${src}`} src={src} state={state} pack={props.pack} apply={source ? applyFrom(source) : apply} openMove={props.openMove} rollOracle={props.rollOracle} kind={kind} done={done} testid={testid} />
   );
 
   const statValue = (s: string) => (["health", "spirit", "supply"].includes(s) ? c[s as "health"] : c.stats[s as "edge"]);
@@ -46,7 +47,7 @@ export function MoveSheet(props: {
       if (!on) return [];
       const ab = props.pack.assets.find((x) => x.id === a.id)?.abilities[i];
       const text = pick(ab?.text, lang);
-      return nameLower.some((n) => text.includes(n)) ? [{ asset: pick(a.name, lang), text, effect: ab?.effect ?? "" }] : [];
+      return nameLower.some((n) => text.includes(n)) ? [{ asset: pick(a.name, lang), text, effect: ab?.effect ?? "", source: `asset:${a.id}:${i}` }] : [];
     }),
   );
 
@@ -203,7 +204,7 @@ export function MoveSheet(props: {
                 {related.map((r, i) => (
                   <div key={i} className="iw-small">
                     <b>{r.asset}</b>：{r.text}
-                    {r.effect && consequence(r.effect, `asset-${i}`)}
+                    {r.effect && consequence(r.effect, `asset-${i}`, pending.used?.includes(r.source), r.source)}
                   </div>
                 ))}
               </div>
