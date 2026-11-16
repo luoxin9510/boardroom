@@ -87,3 +87,32 @@ body,
   gap: 8px;
   padding-top: 16px;
 }
+
+.app-update {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  top: calc(8px + env(safe-area-inset-top));
+  z-index: 100;
+  display: flex;
+  border-radius: 12px;
+  background: #e2a93b;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+.app-update button {
+  border: none;
+  background: none;
+  color: #1b1a17;
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  min-height: 48px;
+}
+.app-update-go {
+  flex: 1;
+  text-align: left;
+  padding: 0 16px;
+}
+.app-update-x {
+  width: 48px;
+}
