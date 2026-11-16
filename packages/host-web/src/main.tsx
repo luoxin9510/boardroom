@@ -14,9 +14,12 @@ function Root() {
   useEffect(() => {
     if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
     const sw = navigator.serviceWorker;
-    // With no controller yet this is the first install, not an update.
-    const hadController = !!sw.controller;
-    const onChange = () => hadController && setUpdated(true);
+    // With no controller yet, the first takeover is the first install (clients.claim), not an update; any later one is.
+    let had = !!sw.controller;
+    const onChange = () => {
+      if (had) setUpdated(true);
+      had = true;
+    };
     sw.addEventListener("controllerchange", onChange);
     let reg: ServiceWorkerRegistration | undefined;
     sw.register("./sw.js")
@@ -39,9 +42,14 @@ function Root() {
     <>
       <Shell offlineReady={offlineReady} />
       {updated && (
-        <button className="app-update" onClick={() => location.reload()} data-testid="app-update">
-          {zh ? "新版本已下载，点这里更新" : "A new version is ready, tap to update"}
-        </button>
+        <div className="app-update">
+          <button className="app-update-go" onClick={() => location.reload()} data-testid="app-update">
+            {zh ? "新版本已下载，点这里更新" : "A new version is ready, tap to update"}
+          </button>
+          <button className="app-update-x" onClick={() => setUpdated(false)} aria-label={zh ? "稍后" : "Later"} data-testid="app-update-later">
+            ✕
+          </button>
+        </div>
       )}
     </>
   );
