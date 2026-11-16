@@ -5,7 +5,7 @@ Play the board games you own on your phone, offline. An installable web app (PWA
 Each game is a TypeScript rules engine plus a mobile-first React UI. A game's content (card images, card data, rules) is never in this repo or on the website: you keep it in your own Obsidian vault, pack it into a zip and import it on your phone, where it stays. The repo only ships code and original test cards, which you can play in the app right away.
 
 - First game: **Goblin Mountain** (solo), a 9-card print-and-play game by Roman Flückiger. You need your own copy of the cards; the built-in test cards are invented.
-- Design docs (Chinese): [platform PRD](docs/prd.md), [Goblin Mountain](docs/games/goblin-mountain.md), [Zombicide: Black Plague (paused)](docs/games/zombicide-black-plague.md).
+- Design docs (Chinese): [platform PRD](docs/prd.md), [Goblin Mountain (wrapped up)](docs/games/goblin-mountain.md), [Zombicide: Black Plague (paused)](docs/games/zombicide-black-plague.md).
 
 ## On the phone
 
