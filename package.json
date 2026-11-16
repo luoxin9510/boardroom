@@ -2,20 +2,24 @@
   "name": "boardroom",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "games/*"],
+  "workspaces": [
+    "packages/*",
+    "games/*"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "dev": "npm run dev -w @boardroom/host-web",
-    "build": "npm run build -w @boardroom/host-obsidian",
+    "build": "npm run build -w @boardroom/host-web",
     "e2e": "npm run e2e -w @boardroom/host-web",
-    "install:vault": "node scripts/install-vault.mjs",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "pack": "node scripts/pack.mjs"
   },
   "devDependencies": {
+    "@types/node": "^22.10.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@types/node": "^22.10.0",
+    "fflate": "^0.8.2",
     "happy-dom": "^15.11.7",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

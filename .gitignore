@@ -2,7 +2,5 @@ node_modules/
 dist/
 .DS_Store
 *.local.*
-/vault/
 test-results/
 playwright-report/
-packages/host-obsidian/build/

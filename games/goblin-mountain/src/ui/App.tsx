@@ -4,7 +4,7 @@ import { LangProvider, Sheet, Toasts, useLang, useToasts, useWakeLock } from "@b
 import { CARD_FOLDER, parseContent } from "../content";
 import { makeEngine, score, type Action, type Event, type Options, type State } from "../engine";
 import { messages } from "../messages";
-import { recordNote, recordPath } from "../record";
+import { recordName, recordNote } from "../record";
 import type { ContentPack } from "../types";
 import { Board, ManualSheet } from "./Board";
 import { feed } from "./text";
@@ -134,15 +134,18 @@ function Game({ host }: { host: Host }) {
     rerender();
   };
 
-  const writeRecord = async () => {
+  /** Exports the game as a markdown note (share sheet or download), ready to drop into a vault. */
+  const shareRecord = async () => {
     const s = session.current;
     if (!s) return;
-    // Never overwrite an earlier record: add " 2", " 3"… when the name is taken.
-    const base = recordPath(s.state, t).replace(/\.md$/, "");
-    let path = `${base}.md`;
-    for (let n = 2; (await host.readFile(path)) !== null; n++) path = `${base} ${n}.md`;
-    await host.writeFile(path, recordNote(s.state, s.toSave(), t));
-    setSavedPath(path);
+    const name = recordName(s.state, t);
+    try {
+      await host.share(name, recordNote(s.state, s.toSave(), t), "text/markdown");
+      setSavedPath(name);
+    } catch (e) {
+      // Closing the share sheet is not an error worth showing.
+      if ((e as Error)?.name !== "AbortError") push(t("toast.saveFailed", { detail: String(e) }), "bad");
+    }
   };
 
   if (error) {
@@ -212,7 +215,7 @@ function Game({ host }: { host: Host }) {
           {savedPath ? (
             <div className="gm-muted">{t("over.saved", { path: savedPath })}</div>
           ) : (
-            <button className="br-btn is-block" onClick={() => void writeRecord()} data-testid="record">
+            <button className="br-btn is-block" onClick={() => void shareRecord()} data-testid="record">
               {t("over.save")}
             </button>
           )}

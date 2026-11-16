@@ -1,16 +1,16 @@
 # boardroom 平台 PRD
 
-> 状态：v1.0 定稿（2026-11-16），四轮拷问 + 手机实测之后。每款游戏的规格在 `docs/games/`：
+> 状态：v2.0（2026-11-16）：宿主从 Obsidian 插件改成 PWA（决定 13–17）。v1.0 是四轮拷问 + 手机实测之后定的。每款游戏的规格在 `docs/games/`：
 > - [哥布林山脉](games/goblin-mountain.md)（当前）
 > - [Zombicide 黑死病](games/zombicide-black-plague.md)（暂停）
 
 ## 1. 目标
 
-把作者买的桌游一款一款做成电子版，**在 iPhone 上离线单人玩**，和 Obsidian 深度结合；以后再加双人和联机。
+把作者买的桌游一款一款做成电子版，**在 iPhone 上离线单人玩**（PWA，加到主屏幕）；内容在 Obsidian vault 里编辑；以后再加双人和联机。
 
 - **只给自己用**（以后加朋友），不公开上线。
-- **代码公开，内容私有。** 公开仓库只有引擎、界面、插件和原创测试内容；商业游戏的卡图、卡面数据、规则原文只在作者的 vault 里。
-- **一款游戏一个 vault**，放在 iCloud 的 Obsidian 文件夹里（`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/<游戏名>/`），手机和 Mac 自动同步。
+- **代码公开，内容私有。** 公开仓库和公开网页只有引擎、界面和原创测试内容；商业游戏的卡图、卡面数据、规则原文只在作者的 vault 和作者手机里（导入的内容包）。
+- **一款游戏一个 vault**，放在 iCloud 的 Obsidian 文件夹里（`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/<游戏名>/`），作者在 Mac 上编辑；要上手机时打成内容包导入 App。
 - **中英双语**，随时切换。
 
 ## 2. 非目标（现在）
@@ -18,37 +18,33 @@
 - 公开托管、账号、匹配；联机多人（以后要做时再加服务端）。
 - 电脑对手。
 - 通用桌游规则 DSL：每款游戏的规则用 TypeScript 写，共用部分抽成库。
-- 单独的原生 App；PWA 和单文件 HTML 导出放到「之后」。
+- 单独的原生 App、应用商店。
 
-## 3. 宿主：Obsidian 插件（手机实测通过）
+## 3. 宿主：PWA
 
-2026-11-16 在作者的 iPhone（iOS 18.7，Obsidian 1.15.1，视口 440×956 @3x，安全区上 62 下 34）上用验证插件实测（`spikes/obsidian-mobile`）：
+- **托管**：GitHub Pages（`https://luoxin9510.github.io/boardroom/`），推到 main 自动部署（`.github/workflows/pages.yml`）。页面里只有代码和原创测试卡，公开没有问题。
+- **安装**：iPhone Safari 打开 → 分享 → 添加到主屏幕。主屏幕上的 PWA 全屏运行，数据不会因为长时间不用被系统清掉。
+- **离线**：构建时生成 `sw.js`，第一次打开就把所有文件缓存下来，之后完全离线可用；新版本部署后下次打开自动换新缓存。
+- **内容进手机**：在 Mac 上 `npm run pack -- <vault>` 把 `boardroom.json`、`卡牌/`、`规则/` 里的笔记和图片打成 zip（不含 PDF、隐藏文件和 `对局/`），AirDrop 到手机，在 App 的书架页「导入内容包」。导入时先用游戏自己的解析器检查，有错就显示原因、不覆盖旧内容。Finder 直接压缩 vault 文件夹得到的 zip 也认（自动找 `boardroom.json` 所在的文件夹，忽略 `__MACOSX`）。
+- **本机存储**（IndexedDB，一个库 `boardroom`）：`content` 存导入的内容包（按文件存字节，不存 Blob：WebKit 无痕模式存不了 Blob），`files` 存存档，`packs` 存每个内容包的导入信息。语言设置放 localStorage（丢了只是语言回到默认）。
+- **书架页**：已导入的游戏（开始 / 删除内容，删除要点两次，存档保留）、导入内容包、用测试卡试玩、导出全部存档（JSON，备份用）、「添加到主屏幕」提示、离线就绪标记。
+- **测试卡**：`fixtures/` 的原创卡打包进 App，谁都能试玩，e2e 也用它；存档和真内容分开放（`<游戏>@demo`）。
 
-| 能力 | 结果 | 做法 |
-|---|---|---|
-| 自定义视图 + 读 vault 图片 | ✅ | `ItemView` + `vault.getResourcePath` |
-| 写笔记 | ✅ | `vault.create/modify` |
-| 隐藏顶栏和底部导航栏 | ✅ | 游戏打开时给 body 加 class，CSS 隐藏 `.view-header`（只限本视图）、`.mobile-navbar`、`.mobile-toolbar`，关闭视图时移除 |
-| 横滑和侧栏手势冲突 | 不拦截时**经常误拉侧栏**；拦截后不会 | 游戏视图根节点上 `touchstart/move/end`、`pointerdown/move` 一律 `stopPropagation` |
-| 顶部下拉 | 不触发命令面板 | — |
-| 屏幕常亮 | ✅ `navigator.wakeLock` 可用 | 游戏视图可见时申请，隐藏或关闭时释放，切回前台重新申请 |
-| 流畅度 | 顺滑 | — |
-| WebGL2 | 可用 | 现在用不到 |
-
-开发时同一套界面也能在浏览器里跑（`host-web`），方便调试和自动化测试。
+> 2026-11-16 曾用 Obsidian 插件当宿主（M0、M1），手机上实测可行（沉浸、手势拦截、常亮都行），但作者决定不在 Obsidian 里开发（决定 13）。插件代码在 git 历史里（PR #1、#2）。
 
 ## 4. 架构
 
 ```
 packages/
   core/            种子随机、对局会话（动作日志、撤销、存档）、待选、i18n、公共类型
-  ui/              React 外壳：沉浸框架、底部面板、按钮、语言切换、提示、待选面板、主题
-  host-obsidian/   Obsidian 插件：视图、vault 读写、沉浸/手势/常亮、命令、安装脚本
-  host-web/        Vite 开发宿主：读 fixtures、localStorage 存档；给浏览器调试和 e2e 用
+  ui/              React 外壳：底部面板、按钮、语言切换、提示、加减器、屏幕常亮、主题
+  host-web/        PWA：书架页、内容包导入、IndexedDB 存储、service worker、manifest；e2e 跑在它的生产构建上
 games/
   goblin-mountain/ 规则引擎、内容包解析和校验、游戏界面、zh/en 文案
 fixtures/
-  goblin-mountain/ 原创测试卡（原创地点名和数值），测试和文档用
+  goblin-mountain/ 原创测试卡（原创地点名和数值），测试、文档和 App 里的「测试卡试玩」用
+scripts/
+  pack.mjs         把 vault 打成内容包 zip
 ```
 
 ### 4.1 引擎约定（参照 BoardOL）
@@ -64,27 +60,27 @@ fixtures/
 
 - 一局 = 内容包版本 + 种子 + 选项 + 动作列表。
 - 撤销 = 回到最后一个动作之前的状态（与"去掉它后从头重放"结果相同，读档时就是这样重放的）；撤销不改变随机结果。一次撤销只退一个动作（比如先退"跳过"，再退移动）。
-- 存档：`对局/存档/<id>.json`，每个动作后写一次（排队按顺序写，旧存档不会盖掉新的）；打开 vault 时可以「继续上一局」，但卡牌内容哈希必须和存档一致，否则提示开新局。
-- 结束：写一篇 `对局/<日期>-<时分> <游戏> <结果>.md`（本地时间；重名时加 " 2"、" 3"，不覆盖旧记录），内容有结果、关键事件、种子和动作列表，链接到用到的卡牌笔记。
+- 存档：手机本地（IndexedDB）`对局/存档/<id>.json`，每个动作后写一次（排队按顺序写，旧存档不会盖掉新的）；开始页可以「继续上一局」，但卡牌内容哈希必须和存档一致（重新导入改过的内容包后不行），否则提示开新局。
+- 结束：「导出对局记录」把 `<日期>-<时分> <游戏> <结果>.md` 交给系统分享（手机上可以存到「文件」或分享进 Obsidian，电脑上是下载），内容有结果、计分、种子、动作列表和指向卡牌笔记的链接，放进 vault 的 `对局/` 就能用。
 
 ### 4.3 内容包
 
-- 游戏数据都是 vault 里的 markdown 笔记（frontmatter + 表格）和图片，人读人改。
+- 游戏数据都是 vault 里的 markdown 笔记（frontmatter + 表格）和图片，人读人改；`npm run pack` 打成 zip 导入 App（§3）。
 - 文件夹、笔记名、表格列名用中文；frontmatter 键和 ID 用英文；列名到字段的映射写在代码里，写错就报人话错误（指出文件、行、列）。
-- 插件监听 vault 改动，内容改了就重新加载；**进行中的对局用开局时的内容快照**，不受影响。
+- 改了内容要重新打包、重新导入；导入只替换内容，存档保留。
 - vault 根目录的 `boardroom.json` 声明这是哪款游戏：`{ "game": "goblin-mountain" }`。
 
 ### 4.4 双语
 
 - 所有界面文案放在 `zh` 和 `en` 两个文案表里，组件里不写死文字；测试检查两边的 key 完全一致。
 - 卡面数据同时有中文名和英文名两列。
-- 默认语言跟随 Obsidian 的界面语言（读不到就用系统语言）；右上角「中 / EN」切换，对局不中断，选择存在插件设置里。
+- 默认语言跟随系统语言；右上角「中 / EN」切换，对局不中断，选择存在本机。
 
 ### 4.5 手机界面硬要求（每个里程碑的验收标准）
 
 - 以 440×956（作者的手机）为主设计尺寸，375×667（iPhone SE）兜底；竖屏。
 - 单手操作：常用操作在屏幕下方 1/3；点击区域不小于 44×44pt。
-- 尊重安全区；沉浸模式下自己画一个退出按钮。
+- 尊重安全区（状态栏用 black-translucent，界面自己留出安全区）；游戏里有退出按钮回书架。
 - 禁止误触：游戏区域禁用文字选择、长按菜单、双击缩放。
 - 每个操作有视觉反馈；音效可开关；不依赖震动。
 - 深色主题，跟卡牌的暗色画风一致；数值用大号字。
@@ -93,15 +89,15 @@ fixtures/
 
 ## 5. 技术栈和工程
 
-- TypeScript，npm workspaces，React，esbuild 打插件，Vite 跑 host-web，vitest 跑测试，Playwright 跑 host-web 的 e2e（手机视口）。
-- GitHub 公开仓库 `luoxin9510/boardroom`，MIT。CI：类型检查、单元测试、构建插件、WebKit e2e（lint 暂未接入）。
-- 安装到 vault：`npm run install:vault -- <vault 路径>`，把构建好的插件拷进 `<vault>/.obsidian/plugins/boardroom/` 并启用，iCloud 同步到手机。加 `--fixtures` 会把原创测试卡一并拷进去（只用于测试 vault；已有 `卡牌/` 时拒绝覆盖）。
+- TypeScript，npm workspaces，React，Vite 构建 PWA，fflate 解压/打包 zip，vitest 跑测试，Playwright 在 WebKit 手机视口下跑 PWA 生产构建的 e2e（含导入内容包、离线）。
+- GitHub 公开仓库 `luoxin9510/boardroom`，MIT。CI：类型检查、单元测试、构建、WebKit e2e（lint 暂未接入）；main 自动部署到 GitHub Pages。
+- 内容包：`npm run pack -- <vault 路径> [输出.zip]`，默认放到 `~/Downloads/<游戏>-pack-<日期>.zip`。
 - 流程：每个里程碑 spec → ticket → 分支 → PR → CI 绿 → 独立 Opus 审核 → 合并；里程碑之间停下来等作者用手机试玩。
 - 文档和代码同一个 PR 更新。
 
 ## 6. 之后
 
-PWA 和离线网页版、单文件 HTML 导出、双人同屏、联机（需要 Mac 或 VPS 当服务器）、在笔记里嵌入棋盘（代码块）、Bases 统计所有对局、下一款游戏、恢复 Zombicide。
+双人同屏、联机（需要 Mac 或 VPS 当服务器）、对局统计、下一款游戏、恢复 Zombicide。
 
 ## 7. 决定记录
 
@@ -109,7 +105,7 @@ PWA 和离线网页版、单文件 HTML 导出、双人同屏、联机（需要 
 
 1. 手动调整永远保留；规则只高亮、不拦人的「辅助」模式只给 Zombicide 用，小游戏完整执行规则。
 2. 撤销不改变随机结果，想重掷就用手动调整。
-3. 存档和对局记录放在 vault。
+3. ~~存档和对局记录放在 vault。~~ 改成存档在手机本地、对局记录导出（决定 16）。
 4. 中文字段名和英文 ID 的约定（§4.3）。
 5. 引擎核心带待选状态；待选面板预选推荐项，可设「以后都按推荐自动」。
 6. 素材由 agent 用脚本处理（切卡、转正、压缩）。
@@ -119,6 +115,14 @@ PWA 和离线网页版、单文件 HTML 导出、双人同屏、联机（需要 
 
 8. 先做小 PnP 游戏，第一款哥布林山脉，**只做单人**。
 9. 中英双语。
-10. 手机完全离线独立运行 → 宿主改成 **Obsidian 插件**（实测通过，§3）；浏览器宿主只用于开发和测试。
+10. 手机完全离线独立运行 → 宿主改成 **Obsidian 插件**（实测通过）。后被决定 13 取代。
 11. vault 放 iCloud 的 Obsidian 文件夹，一款游戏一个。
 12. 本机服务、局域网、联机都推迟到「之后」。
+
+转向 PWA（2026-11-16，M1 合并之后）：
+
+13. **不在 Obsidian 里开发**，改做 PWA；删掉插件和 spike。vault 留着当编辑内容的地方。
+14. 内容靠**导入内容包**进手机（`npm run pack` → AirDrop → 导入），完全离线、不经过服务器；不用私有服务器部署。
+15. 代码托管在 **GitHub Pages**（只有代码，公开没问题）。
+16. 存档放手机本地 IndexedDB；对局记录在结束页「导出」（分享成 Markdown，可进 Obsidian）；设置里能导出全部存档备份。
+17. 顺序：先做 PWA 迁移，再做 M2（规则页 + 新手教程），规则原文和翻译也走内容包。

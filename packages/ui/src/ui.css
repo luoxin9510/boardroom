@@ -1,4 +1,4 @@
-/* Shared shell styles. Everything is scoped under .br-root so it never leaks into Obsidian. */
+/* Shared shell styles. Everything is scoped under .br-root. */
 .br-root {
   --br-bg: #0f1013;
   --br-panel: #1b1d22;
