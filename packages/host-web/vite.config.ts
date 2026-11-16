@@ -15,7 +15,8 @@ function serviceWorker(): Plugin {
   return {
     name: "boardroom-sw",
     apply: "build",
-    generateBundle(_options, bundle) {
+    // "post", so Vite's own HTML step has already added index.html to the bundle and it counts towards the version.
+    generateBundle: { order: "post", handler(_options, bundle) {
       const published = walk(publicDir);
       const files = ["./", ...Object.keys(bundle), ...published].filter((f) => !f.endsWith(".map")).map((f) => (f === "./" ? f : `./${f}`));
       // The version covers file contents, not just names: a change to index.html, the manifest or an icon is a new version too.
@@ -44,7 +45,7 @@ self.addEventListener("fetch", (e) => {
 });
 `;
       this.emitFile({ type: "asset", fileName: "sw.js", source });
-    },
+    } },
   };
 }
 
