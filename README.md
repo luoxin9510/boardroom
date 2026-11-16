@@ -9,7 +9,7 @@ Each game is a TypeScript rules engine plus a mobile-first React UI. A game's co
 
 ## On the phone
 
-1. Open the link above in Safari → Share → **Add to Home Screen**. From then on it opens offline.
+1. Open the link above in Safari → Share → **Add to Home Screen**. From then on it opens offline. New versions download in the background; a banner ("A new version is ready") appears when one has, tap it to reload.
 2. On the Mac, make a content pack from a game vault and AirDrop it to the phone:
    ```sh
    npm run pack -- "<path to vault>"      # writes ~/Downloads/<game>-pack-<date>.zip
