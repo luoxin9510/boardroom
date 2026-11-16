@@ -1,3 +1,4 @@
+import type React from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Campaign, ContentError, langFromLocale, newSeed, RuleError, type CampaignSave, type Host, type Lang } from "@boardroom/core";
 import { LangProvider, RulesView, Sheet, Toasts, useLang, useToasts, useWakeLock } from "@boardroom/ui";
@@ -8,6 +9,7 @@ import type { ContentPack } from "../types";
 import { MoveSheet } from "./MoveSheet";
 import { CharacterTab, JournalTab, MetersBar, MovesTab, OraclesTab, TracksTab, type Portraits } from "./Tabs";
 import { Wizard } from "./Wizard";
+import { artFrom, ArtProvider, Banner, useArt } from "./art";
 import { entryText, journalMarkdown, type Note } from "./text";
 import "./iw.css";
 
@@ -31,11 +33,15 @@ export function App(props: { host: Host }) {
     setLangState(l);
     void host.setSetting("lang", l);
   };
+  const art = useMemo(() => artFrom(host.imageUrl), [host]);
+  const bg = art("背景");
   return (
     <LangProvider tables={messages} lang={lang} onChange={setLang}>
-      <div className="br-root iw-root">
-        <Game host={host} />
-      </div>
+      <ArtProvider art={art}>
+        <div className={`br-root iw-root${bg ? " has-bg" : ""}`} style={bg ? ({ "--iw-bg": `url("${bg}")` } as React.CSSProperties) : undefined}>
+          <Game host={host} />
+        </div>
+      </ArtProvider>
     </LangProvider>
   );
 }
@@ -281,9 +287,10 @@ function CampaignList(props: {
   const { t } = useLang();
   const [name, setName] = useState("");
   const [confirm, setConfirm] = useState<string | null>(null);
+  const cover = useArt()("封面");
   return (
     <div className="iw-screen iw-start" data-testid="campaigns">
-      <h1>{t("game.title")}</h1>
+      {cover ? <Banner name="封面" tall title={t("game.title")} testid="cover" /> : <h1>{t("game.title")}</h1>}
       <div className="iw-muted">{t("game.subtitle")}</div>
       <div className="iw-new">
         <input className="iw-input" placeholder={t("list.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} data-testid="new-name" />

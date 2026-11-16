@@ -300,3 +300,22 @@ test("choose a character portrait", async ({ page }) => {
   await page.getByTestId("portrait-none").tap();
   await expect(page.getByTestId("top-portrait")).toHaveCount(0);
 });
+
+test("decoration from the pack: cover, background, tab and move banners", async ({ page }) => {
+  await page.getByTestId("demo-ironsworn").tap();
+  await page.getByTestId("intro-ok").tap();
+  await expect(page.getByTestId("cover")).toBeVisible();
+  await expect(page.getByTestId("cover")).toContainText("铁誓");
+  await expect(page.locator(".iw-root.has-bg")).toHaveCount(1);
+  await page.getByTestId("new-name").fill("艾拉");
+  await page.getByTestId("new-campaign").tap();
+  await page.getByTestId("wiz-skip").tap();
+  await expect(page.getByTestId("banner-行动")).toBeVisible();
+  await page.getByTestId("move-probe").tap();
+  await expect(page.getByTestId("banner-类别-adventure")).toBeVisible();
+  await page.locator(".br-sheet-backdrop").click({ position: { x: 10, y: 10 } });
+  // tabs without a picture in the pack simply have none
+  await page.getByTestId("nav-oracles").tap();
+  await expect(page.locator(".iw-banner")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
+});
