@@ -51,6 +51,16 @@ describe("content", () => {
     expect(contentErr(withNote("动作/x.md", "---\ntype: move\nid: x\ncategory: fate\nroll: none\n---\n| 结果 | 中文 | English | 后果 |\n|---|---|---|---|\n| any | a | b | oracle:nope |\n"))?.detail).toMatch(/no oracle table/);
     expect(contentErr(withNote("动作/x.md", "---\ntype: move\nid: x\ncategory: fate\nroll: action\nstats: [luck]\n---\n"))?.detail).toMatch(/not a stat/);
   });
+  it("doesn't drop notes or values silently", () => {
+    expect(contentErr(withNote("动作/x.md", "---\ntype: mvoe\nid: x\n---\n"))?.detail).toMatch(/type: move/);
+    expect(contentErr(withNote("动作/x.md", "just text\n"))?.detail).toMatch(/type: move/);
+    expect(contentErr(withNote("资产/x.md", "---\ntype: asset\nid: x\ncategory: companion\nhealth: three\n---\n| 序号 | 中文 | English | 默认 |\n|---|---|---|---|\n| 1 | a | a | ✓ |\n"))?.detail).toMatch(/health/);
+    const twoStrong = "---\ntype: move\nid: x\ncategory: fate\nroll: action\nstats: [edge]\n---\n| 结果 | 中文 | English | 后果 |\n|---|---|---|---|\n| strong | a | a | |\n| strong | b | b | |\n";
+    expect(contentErr(withNote("动作/x.md", twoStrong))).toMatchObject({ line: 11, detail: expect.stringMatching(/two "strong"/) });
+    const unescaped = "---\ntype: move\nid: x\ncategory: fate\nroll: action\nstats: [edge]\n---\n| 结果 | 中文 | English | 后果 |\n|---|---|---|---|\n| strong | a | a | 二选一(momentum+1 | health+1) |\n";
+    expect(contentErr(withNote("动作/x.md", unescaped))?.detail).toMatch(/write the \| between choices/);
+    expect(contentErr(withNote("先知/x.md", "---\ntype: oracle\nid: x\ndice: d0\n---\n"))?.detail).toMatch(/at least 2/);
+  });
 });
 
 describe("consequence vocabulary", () => {
@@ -79,6 +89,8 @@ describe("consequence vocabulary", () => {
     expect(() => parseEffect("mark:sad")).toThrow(/unknown debility/);
     expect(() => parseEffect("二选一(momentum+1 | health+1")).toThrow(/unclosed/);
     expect(() => parseEffect("momentum+1 &")).toThrow(/empty/);
+    expect(() => parseEffect("二选一(momentum+1 | health+1）")).toThrow(/closed with/);
+    expect(parseEffect("二选一（momentum+1 | health+1）")).toMatchObject({ k: "choose" });
   });
 });
 
@@ -99,6 +111,15 @@ describe("action rolls", () => {
     expect(c.state.pending).toMatchObject({ outcome: "strong", burned: true });
     expect(c.state.character.momentum).toBe(2);
     expect(errKey(() => c.act({ t: "burn" }))).toBe("err.cantBurn");
+  });
+  it("no burning after a consequence was taken (raising harm first is fine)", () => {
+    const c = campaign((s) => (s.character.momentum = 8));
+    c.act({ t: "roll", move: "probe", stat: "edge", dice: { d6: 3, c1: 4, c2: 7 } });
+    c.act({ t: "effect", atoms: atoms("harm+1") });
+    expect(canBurn(c.state)).toBe(true);
+    c.act({ t: "effect", atoms: atoms("momentum+1") });
+    expect(c.state.pending?.outcome).toBe("weak");
+    expect(canBurn(c.state)).toBe(false);
   });
   it("won't offer a burn that changes nothing, and resets lower with debilities", () => {
     const c = campaign((s) => {
@@ -148,6 +169,8 @@ describe("meters, momentum and debilities", () => {
     });
     expect(effect(c, "supply-2")).toContainEqual({ k: "prompt", key: "outOfSupply", amount: 2 });
     expect(errKey(() => effect(c, "health+1"))).toBe("err.wounded");
+    effect(c, "mark:unprepared");
+    expect(errKey(() => effect(c, "supply+1"))).toBe("err.unprepared");
     c.act({ t: "meter", meter: "health", delta: 1 });
     expect(c.state.character.health).toBe(5);
   });
@@ -219,7 +242,7 @@ describe("walkthroughs on the test content (M0 acceptance)", () => {
     c.act({ t: "roll", move: "hold-fast", dice: { d6: 1, c1: 8, c2: 9 } });
     expect(c.state.pending).toMatchObject({ stat: "iron", outcome: "miss" });
     c.act({ t: "oracle", table: "last-stand", dice: 95 });
-    expect(c.state.journal.at(-1)).toMatchObject({ k: "oracle", text: { en: "You rise, against all odds." } });
+    expect(c.journal.at(-1)).toMatchObject({ k: "oracle", text: { en: "You rise, against all odds." } });
   });
 
   it("an old save still loads after the content pack renames things", () => {
@@ -229,11 +252,22 @@ describe("walkthroughs on the test content (M0 acceptance)", () => {
     c.act({ t: "oracle", table: "spark" });
     const save = JSON.parse(JSON.stringify(c.toSave()));
     const renamed = fixtureNotes().map((n) => ({ ...n, text: n.text.replace("zh: 试探", "zh: 探路").replace("zh: 巡路人", "zh: 寻路者") }));
-    const { campaign: loaded, stoppedAt } = Campaign.fromSave(makeEngine(parseContent(renamed)), save);
-    expect(stoppedAt).toBeNull();
-    expect(loaded.state.journal.length).toBe(c.state.journal.length);
+    const { campaign: loaded, fellBack } = Campaign.fromSave(makeEngine(parseContent(renamed)), save);
+    expect(fellBack).toBeNull();
+    expect(loaded.journal.length).toBe(c.journal.length);
     // Replaying picks up the new wording: renamed terms flow into old campaigns.
     expect(loaded.state.character.assets[0]?.name.zh).toBe("寻路者");
+  });
+
+  it("keeps the saved numbers when newer content would replay differently", () => {
+    const c = campaign((s) => (s.character.health = 4));
+    c.act({ t: "roll", move: "hold-fast", dice: { d6: 1, c1: 9, c2: 9 } });
+    const save = JSON.parse(JSON.stringify(c.toSave()));
+    const changed = fixtureNotes().map((n) => ({ ...n, text: n.text.replace("pick: max", "pick: min") }));
+    const { campaign: loaded, fellBack } = Campaign.fromSave(makeEngine(parseContent(changed)), save);
+    expect(fellBack).toBe("differs");
+    expect(loaded.state.pending).toMatchObject({ stat: "health", statValue: 4 });
+    expect(loaded.journal.length).toBe(c.journal.length);
   });
 });
 
@@ -242,7 +276,7 @@ describe("oracles", () => {
     const ask = (odds: "fiftyFifty" | "likely", dice: number) => {
       const c = campaign();
       c.act({ t: "ask", odds, dice });
-      return c.state.journal.at(-1);
+      return c.journal.at(-1);
     };
     expect(ask("fiftyFifty", 50)).toMatchObject({ yes: false, match: false });
     expect(ask("fiftyFifty", 51)).toMatchObject({ yes: true });

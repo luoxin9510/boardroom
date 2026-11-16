@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Campaign, RuleError, rollDie, type CampaignEngine } from "../src";
 
+
 type S = { rng: number; total: number; rolls: number[] };
 type A = { add: number } | { roll: true };
 const engine: CampaignEngine<S, A, string> = {
@@ -31,21 +32,32 @@ describe("campaign session", () => {
     for (let i = 0; i < 8; i++) c.act(i % 2 ? { roll: true } : { add: 1 });
     const save = JSON.parse(JSON.stringify(c.toSave()));
     expect(save).not.toHaveProperty("contentHash");
-    const { campaign, stoppedAt } = Campaign.fromSave(engine, save, 3);
-    expect(stoppedAt).toBeNull();
+    const { campaign, fellBack } = Campaign.fromSave(engine, save, 3);
+    expect(fellBack).toBeNull();
     expect(campaign.state).toEqual(c.state);
+    expect(campaign.journal).toEqual(c.journal);
     c.undo();
     c.act({ roll: true });
     expect(c.state.rolls.at(-1)).toBe(campaign.state.rolls.at(-1));
   });
-  it("falls back to the saved current state when an action no longer applies", () => {
+  it("falls back to the saved state when replay fails or comes out different, keeping the journal", () => {
     const played = new Campaign(engine, "g", "c1", "t", start());
     played.act({ add: 1 });
     played.act({ add: 2 });
-    const save = { ...played.toSave(), actions: [{ add: 1 }, { add: -1 }] as A[] };
-    const { campaign, stoppedAt } = Campaign.fromSave(engine, save);
-    expect(stoppedAt).toBe(1);
-    expect(campaign.state.total).toBe(3);
-    expect(campaign.canUndo).toBe(false);
+    const failed = Campaign.fromSave(engine, { ...played.toSave(), actions: [{ add: 1 }, { add: -1 }] as A[] });
+    expect(failed.fellBack).toBe("failed");
+    expect(failed.campaign.state.total).toBe(3);
+    expect(failed.campaign.canUndo).toBe(false);
+    expect(failed.campaign.journal).toEqual(["ok", "ok"]);
+    const differs = Campaign.fromSave(engine, { ...played.toSave(), actions: [{ add: 1 }, { add: 5 }] as A[] });
+    expect(differs.fellBack).toBe("differs");
+    expect(differs.campaign.state.total).toBe(3);
+  });
+  it("undo takes the action's journal entries with it", () => {
+    const c = new Campaign(engine, "g", "c1", "t", start(), undefined, 2);
+    for (let i = 0; i < 5; i++) c.act({ add: 1 });
+    expect(c.journal.length).toBe(5);
+    c.undo();
+    expect(c.journal.length).toBe(4);
   });
 });

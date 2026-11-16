@@ -55,7 +55,11 @@ function checkEffect(file: string, line: number, src: string): string {
   try {
     parseEffect(src);
   } catch (e) {
-    if (e instanceof EffectError) throw new ContentError(file, line, `consequence: ${e.message}`);
+    if (e instanceof EffectError) {
+      // An unescaped | inside a table cell splits the cell, which shows up as an unclosed bracket.
+      const hint = /unclosed/.test(e.message) ? ' (inside a table, write the | between choices as \\|)' : "";
+      throw new ContentError(file, line, `consequence: ${e.message}${hint}`);
+    }
     throw e;
   }
   return src.trim();
@@ -80,6 +84,7 @@ function parseMove(raw: Raw, n: Note): Move {
   for (const row of n.rows) {
     const key = cell(n, row, "结果", "Result").toLowerCase() as ResultKey;
     if (!["strong", "weak", "miss", "before", "any"].includes(key)) throw new ContentError(n.file, row.line, `结果 must be strong, weak, miss, before or any, not "${key}"`);
+    if (results[key]) throw new ContentError(n.file, row.line, `there are two "${key}" rows`);
     results[key] = {
       text: { zh: cell(n, row, "中文"), en: cell(n, row, "English") },
       effect: checkEffect(n.file, row.line, cell(n, row, "后果", "Effect")),
@@ -104,11 +109,12 @@ function parseAsset(n: Note): Asset {
   if (!["companion", "path", "combat", "ritual"].includes(category)) throw new ContentError(n.file, 1, "category must be companion, path, combat or ritual");
   const abilities = n.rows.map((row) => ({
     text: { zh: cell(n, row, "中文"), en: cell(n, row, "English") },
-    start: /✓|✔|x|yes|是/i.test(cell(n, row, "默认", "Start")),
+    start: /^(✓|✔|x|yes|y|是)$/i.test(cell(n, row, "默认", "Start").trim()),
     effect: checkEffect(n.file, row.line, cell(n, row, "后果", "Effect")),
   }));
   if (!abilities.length) throw new ContentError(n.file, 1, "an asset needs a table of abilities (| 序号 | 中文 | English | 默认 | 后果 |)");
   const health = n.meta.health === undefined ? undefined : Number(n.meta.health);
+  if (health !== undefined && !(Number.isInteger(health) && health >= 1 && health <= 10)) throw new ContentError(n.file, 1, `health must be a whole number from 1 to 10, not "${n.meta.health}"`);
   return { id: need(n, "id"), category, name: { zh: str(n, "zh"), en: str(n, "en") }, health, field: str(n, "field") || undefined, abilities, file: n.file };
 }
 
@@ -136,6 +142,7 @@ function parseOracle(n: Note): Oracle {
   const m = /^d(\d+)$/.exec(dice);
   if (!m) throw new ContentError(n.file, 1, `dice must look like d100 or d6, not "${dice}"`);
   const sides = Number(m[1]);
+  if (sides < 2) throw new ContentError(n.file, 1, `dice must have at least 2 sides, not "${dice}"`);
   const rows = n.rows.map((row) => {
     const [from, to] = parseRange(n.file, row.line, cell(n, row, "范围", "Range"));
     return { from, to, text: { zh: cell(n, row, "中文"), en: cell(n, row, "English") }, line: row.line };
@@ -161,13 +168,20 @@ function parseTruth(n: Note): Truth {
   return { id: need(n, "id"), name: { zh: str(n, "zh"), en: str(n, "en") }, rows: rows.map(({ line: _l, ...r }) => r), file: n.file };
 }
 
-/** Reads every note of a pack (any folder; the frontmatter `type` decides) and checks cross-references. */
+const TYPE_OF_FOLDER: Record<string, string> = { [FOLDERS.moves]: "move", [FOLDERS.assets]: "asset", [FOLDERS.oracles]: "oracle", [FOLDERS.truths]: "truth" };
+
+/**
+ * Reads every note of a pack and checks cross-references. The frontmatter `type` decides what a note is; inside the
+ * 动作/资产/先知/真相 folders a missing or misspelt type is an error rather than a silently dropped note.
+ */
 export function parseContent(notes: Raw[]): ContentPack {
   const pack: ContentPack = { moves: [], assets: [], oracles: [], truths: [] };
   for (const raw of notes) {
     if (!raw.path.endsWith(".md")) continue;
     const n = parseNote(raw.path, raw.text);
     const type = str(n, "type");
+    const expected = TYPE_OF_FOLDER[raw.path.split("/").at(-2) ?? ""];
+    if (expected && type !== expected) throw new ContentError(n.file, 1, `notes in this folder need "type: ${expected}" in the frontmatter${type ? `, not "${type}"` : ""}`);
     if (type === "move") pack.moves.push(parseMove(raw, n));
     else if (type === "asset") pack.assets.push(parseAsset(n));
     else if (type === "oracle") pack.oracles.push(parseOracle(n));
@@ -181,10 +195,12 @@ export function parseContent(notes: Raw[]): ContentPack {
   }
   const moveIds = new Set(pack.moves.map((m) => m.id));
   const oracleIds = new Set(pack.oracles.map((o) => o.id));
+  const texts = new Map(notes.map((n) => [n.path, n.text]));
   const check = (file: string, src: string) => {
     for (const a of atomsOf(parseEffect(src))) {
-      if (a.k === "move" && !moveIds.has(a.id)) throw new ContentError(file, 1, `move:${a.id} — there is no move with that id`);
-      if (a.k === "oracle" && !oracleIds.has(a.id)) throw new ContentError(file, 1, `oracle:${a.id} — there is no oracle table with that id`);
+      const line = lineOf(texts.get(file) ?? "", `${a.k}:${"id" in a ? a.id : ""}`);
+      if (a.k === "move" && !moveIds.has(a.id)) throw new ContentError(file, line, `move:${a.id} — there is no move with that id`);
+      if (a.k === "oracle" && !oracleIds.has(a.id)) throw new ContentError(file, line, `oracle:${a.id} — there is no oracle table with that id`);
     }
   };
   for (const m of pack.moves) for (const r of Object.values(m.results)) if (r) check(m.file, r.effect);

@@ -24,6 +24,13 @@ const { game } = config;
 /** Played games and campaign journals stay out of packs even if listed. */
 const NEVER = new Set(["对局", "战役"]);
 const FOLDERS = (Array.isArray(config.folders) ? config.folders : ["卡牌", "规则"]).filter((f) => !NEVER.has(f));
+for (const f of FOLDERS) {
+  // Only plain top-level folder names: nothing outside the vault can end up in a pack.
+  if (typeof f !== "string" || !f || /[\\/]/.test(f) || f.startsWith(".")) {
+    console.error(`boardroom.json "folders" may only list folder names inside the vault, not "${f}"`);
+    process.exit(1);
+  }
+}
 const KEEP = /\.(md|jpe?g|png|webp|gif|svg)$/i;
 const IMAGE = /\.(jpe?g|png|webp|gif)$/i;
 

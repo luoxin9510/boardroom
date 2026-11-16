@@ -74,13 +74,15 @@ export interface Roll {
   track?: string;
   /** Harm for this roll's "progress×harm" (1 unless a harm+N consequence raised it). */
   harm: number;
+  /** A consequence has been taken: no burning momentum after that (you can't take both results). */
+  resolved: boolean;
 }
 
 export type Odds = "almostCertain" | "likely" | "fiftyFifty" | "unlikely" | "smallChance";
 /** The lowest d100 roll that answers yes. */
 export const ODDS: Record<Odds, number> = { almostCertain: 11, likely: 26, fiftyFifty: 51, unlikely: 76, smallChance: 91 };
 
-/** What the journal records automatically (handwritten text lives outside the state, see spec §2). */
+/** What the journal records automatically. The journal is kept by the Campaign, outside the state (spec §2). */
 export type Entry =
   | { k: "roll"; roll: Roll }
   | { k: "burn"; roll: Roll; momentum: number }
@@ -101,7 +103,6 @@ export interface State {
   tracks: Track[];
   nextTrack: number;
   pending: Roll | null;
-  journal: Entry[];
 }
 
 export type Dice = { d6?: number; c1?: number; c2?: number };
@@ -157,7 +158,7 @@ export function judge(score: number, c1: number, c2: number, burnWith?: number):
 export function canBurn(s: State): boolean {
   const r = s.pending;
   const m = s.character.momentum;
-  if (!r || r.kind !== "action" || r.burned || m <= 0) return false;
+  if (!r || r.kind !== "action" || r.burned || r.resolved || m <= 0) return false;
   const rank = { miss: 0, weak: 1, strong: 2 };
   return rank[judge(r.score, r.c1, r.c2, m)] > rank[r.outcome];
 }
@@ -181,7 +182,12 @@ export function newCharacter(name = ""): Character {
 
 /** A fresh campaign state. */
 export function newCampaign(seed: number, name = ""): State {
-  return { rng: seed >>> 0 || 1, character: newCharacter(name), tracks: [], nextTrack: 1, pending: null, journal: [] };
+  return { rng: seed >>> 0 || 1, character: newCharacter(name), tracks: [], nextTrack: 1, pending: null };
+}
+
+/** What must replay identically on newer content: everything except names, which may be retranslated. */
+export function fingerprint(s: State): string {
+  return JSON.stringify(s, (key, value) => (key === "name" && typeof value === "object" ? undefined : key === "moveName" ? undefined : value));
 }
 
 function statValue(c: Character, stat: RollStat): number {
@@ -202,14 +208,14 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
   const oracles = new Map(pack.oracles.map((o) => [o.id, o]));
 
   return {
+    fingerprint,
     apply(prev, action) {
       const s: State = structuredClone(prev);
       const events: Event[] = [];
       const c = s.character;
-      const log = (e: Entry) => {
-        s.journal.push(e);
-        events.push(e);
-      };
+      // Entries are copies: nothing in the journal shares objects with the state, the action or the content.
+      const log = (e: Entry) => events.push(structuredClone(e));
+      const int = (n: unknown, lo: number, hi: number) => need(Number.isInteger(n) && (n as number) >= lo && (n as number) <= hi, "err.amount");
       const findTrack = (id: string | undefined) => {
         const t = s.tracks.find((x) => x.id === id);
         need(t, "err.noTrack");
@@ -237,6 +243,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
         const from = c[m];
         if (d > 0 && m === "health") need(!c.debilities.includes("wounded"), "err.wounded");
         if (d > 0 && m === "spirit") need(!c.debilities.includes("shaken"), "err.shaken");
+        if (d > 0 && m === "supply") need(!c.debilities.includes("unprepared"), "err.unprepared");
         const raw = from + d;
         c[m] = clamp(raw, 0, 5);
         if (c[m] !== from) log({ k: "meter", meter: m, from, to: c[m] });
@@ -257,7 +264,10 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
         if (has === on) return;
         c.debilities = on ? [...c.debilities, id] : c.debilities.filter((x) => x !== id);
         log({ k: "debility", id, on });
-        if (c.momentum > momentumMax(c)) c.momentum = momentumMax(c);
+        if (c.momentum > momentumMax(c)) {
+          log({ k: "meter", meter: "momentum", from: c.momentum, to: momentumMax(c) });
+          c.momentum = momentumMax(c);
+        }
       };
 
       switch (action.t) {
@@ -287,7 +297,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           const cancelled = c.momentum < 0 && d6 === -c.momentum;
           const sv = statValue(c, stat);
           const score = Math.min(10, (cancelled ? 0 : d6) + sv + adds);
-          s.pending = { kind: "action", move: m.id, moveName: m.name, stat, statValue: sv, adds, actionDie: d6, cancelled, score, c1, c2, outcome: judge(score, c1, c2), match: c1 === c2, burned: false, harm: 1 };
+          s.pending = { kind: "action", move: m.id, moveName: m.name, stat, statValue: sv, adds, actionDie: d6, cancelled, score, c1, c2, outcome: judge(score, c1, c2), match: c1 === c2, burned: false, harm: 1, resolved: false };
           log({ k: "roll", roll: { ...s.pending } });
           break;
         }
@@ -306,7 +316,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           }
           const c1 = die(s, 10, action.dice?.c1);
           const c2 = die(s, 10, action.dice?.c2);
-          s.pending = { kind: "progress", move: m.id, moveName: m.name, statValue: 0, adds: 0, actionDie: 0, cancelled: false, score, c1, c2, outcome: judge(score, c1, c2), match: c1 === c2, burned: false, track: trackId, harm: 1 };
+          s.pending = { kind: "progress", move: m.id, moveName: m.name, statValue: 0, adds: 0, actionDie: 0, cancelled: false, score, c1, c2, outcome: judge(score, c1, c2), match: c1 === c2, burned: false, track: trackId, harm: 1, resolved: false };
           log({ k: "roll", roll: { ...s.pending } });
           break;
         }
@@ -330,8 +340,14 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
             need(v !== undefined && Number.isInteger(v) && v >= 0 && v <= 10, "err.amount");
             return v;
           };
-          const progressTrack = () => findTrack(action.track ?? s.pending?.track);
+          let usedTrack: string | undefined;
+          const progressTrack = () => {
+            const t = findTrack(action.track ?? s.pending?.track);
+            usedTrack = t.id;
+            return t;
+          };
           const resolved: number[] = [];
+          const harmOnly = action.atoms.every((a) => a.k === "harm");
           for (const a of action.atoms) {
             switch (a.k) {
               case "meter": {
@@ -379,7 +395,9 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
                 break;
             }
           }
-          log({ k: "effect", atoms: action.atoms, amounts: resolved, track: action.track });
+          // Taking a consequence settles the roll (raising harm first doesn't).
+          if (s.pending && !harmOnly) s.pending.resolved = true;
+          log({ k: "effect", atoms: action.atoms, amounts: resolved, track: usedTrack });
           break;
         }
 
@@ -418,6 +436,8 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
 
         case "mark": {
           const t = findTrack(action.track);
+          if (action.ticks !== undefined) int(action.ticks, -40, 40);
+          if (action.times !== undefined) int(action.times, -10, 10);
           markTrack(t, action.ticks ?? RANK_TICKS[t.rank] * (action.times ?? 1));
           break;
         }
@@ -432,6 +452,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
         }
 
         case "bonds":
+          int(action.ticks, -40, 40);
           c.bonds = clamp(c.bonds + action.ticks, 0, TRACK_TICKS);
           break;
 
@@ -472,6 +493,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
         case "assetHealth": {
           const owned = c.assets.find((x) => x.id === action.asset);
           need(owned && owned.health !== undefined, "err.noAsset");
+          int(action.delta, -10, 10);
           const max = assets.get(owned.id)?.health ?? 5;
           owned.health = clamp((owned.health as number) + action.delta, 0, max);
           break;
@@ -484,10 +506,13 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           break;
         }
 
-        case "xp":
+        case "xp": {
+          int(action.delta, -30, 30);
+          const from = c.xpEarned;
           c.xpEarned = clamp(c.xpEarned + action.delta, c.xpSpent, 30);
-          log({ k: "xp", delta: action.delta });
+          if (c.xpEarned !== from) log({ k: "xp", delta: c.xpEarned - from });
           break;
+        }
 
         case "initiative":
           c.initiative = action.on;

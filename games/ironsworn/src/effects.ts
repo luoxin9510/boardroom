@@ -35,20 +35,25 @@ export function parseEffect(src: string): Effect | null {
   return parseSeq(s);
 }
 
+const CLOSE: Record<string, string> = { "(": ")", "（": "）" };
+
 function splitTop(s: string, sep: string): string[] {
   const out: string[] = [];
-  let depth = 0;
+  const open: string[] = [];
   let cur = "";
   for (const ch of s) {
-    if (ch === "(" || ch === "（") depth++;
-    if (ch === ")" || ch === "）") depth--;
-    if (depth < 0) throw new EffectError(`unbalanced ")" in "${s}"`);
-    if (ch === sep && depth === 0) {
+    if (ch in CLOSE) open.push(ch);
+    if (ch === ")" || ch === "）") {
+      const o = open.pop();
+      if (o === undefined) throw new EffectError(`unbalanced "${ch}" in "${s}"`);
+      if (CLOSE[o] !== ch) throw new EffectError(`"${o}" is closed with "${ch}" in "${s}"`);
+    }
+    if (ch === sep && open.length === 0) {
       out.push(cur);
       cur = "";
     } else cur += ch;
   }
-  if (depth !== 0) throw new EffectError(`unclosed "(" in "${s}"`);
+  if (open.length) throw new EffectError(`unclosed "${open.at(-1)}" in "${s}"`);
   out.push(cur);
   return out.map((x) => x.trim());
 }
@@ -61,10 +66,10 @@ function parseSeq(s: string): Effect {
 }
 
 function parseItem(s: string): Effect {
-  const m = /^(二选一|选(\d+)|可多选|one|pick(\d+)|any)\s*[(（]([\s\S]*)[)）]$/.exec(s);
+  const m = /^(二选一|选(\d+)|可多选|one|pick(\d+)|any)\s*(?:\(([\s\S]*)\)|（([\s\S]*)）)$/.exec(s);
   if (m) {
     const n = m[1] === "二选一" || m[1] === "one" ? 1 : m[1] === "可多选" || m[1] === "any" ? "any" : Number(m[2] ?? m[3]);
-    const options = splitTop(m[4] as string, "|").map((o) => {
+    const options = splitTop((m[4] ?? m[5]) as string, "|").map((o) => {
       if (!o) throw new EffectError(`empty option in "${s}"`);
       return parseSeq(o);
     });
