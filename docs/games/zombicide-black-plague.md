@@ -1,7 +1,7 @@
 # Zombicide 黑死病（暂停）
 
 > 状态：**暂停**（2026-11-16）。作者决定先做小的 PnP 游戏（见 [哥布林山脉](goblin-mountain.md)）。这份文档保留拷问第 1、2 轮的结论，恢复时从这里接着做。
-> 平台层面的决定已经搬到 [平台 PRD](../prd.md)，那边的较新决定优先：宿主改成 Obsidian 插件、vault 在 iCloud、中英双语、服务和联机推迟。
+> 平台层面的决定已经搬到 [平台 PRD](../prd.md)，那边的较新决定优先：宿主是 PWA、内容在 iCloud 里的 vault 编辑后打包导入、中英双语、服务和联机推迟。
 > vault 仍在 `~/Documents/boardgame/zombicide-黑死病/`。
 
 ## 1. 背景与目标

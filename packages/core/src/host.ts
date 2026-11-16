@@ -1,6 +1,6 @@
 /**
- * What a game needs from the place it runs in: the Obsidian plugin on a phone, or a browser page
- * during development. Paths are relative to the game's vault root.
+ * What a game needs from the place it runs in (the PWA). Content paths are relative to the root of
+ * the game's content pack, which mirrors the author's vault: 卡牌/…, 规则/…
  */
 export interface Host {
   /** Every markdown note under `folder` (recursively), with its text. */
@@ -16,10 +16,12 @@ export interface Host {
   /** Small per-device settings, such as the chosen language. */
   getSetting<V>(key: string): V | undefined;
   setSetting(key: string, value: unknown): Promise<void>;
-  /** The host's interface language, e.g. Obsidian's language or the browser's. */
+  /** The device's language, e.g. navigator.language. */
   locale(): string;
   /** Called when content notes change; returns an unsubscribe function. */
   onContentChange(cb: () => void): () => void;
-  /** Leaves the game screen (closes the view in Obsidian). Optional. */
+  /** Leaves the game screen (back to the library). Optional. */
   exit?(): void;
+  /** Hands a text file to the user: the share sheet on phones, a download elsewhere. */
+  share(name: string, text: string, type: string): Promise<void>;
 }

@@ -3,14 +3,14 @@ import { score, type Action, type Options, type State } from "./engine";
 import { CARD_FOLDER } from "./content";
 import { COLORS } from "./types";
 
-/** File name for the record note: local date and time, game, result. The host adds " 2", " 3"… if taken. */
-export function recordPath(state: State, t: T, date = new Date()): string {
+/** File name for the record note: local date and time, game, result. Unique per minute; drop it into a vault's 对局/ folder. */
+export function recordName(state: State, t: T, date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   const d = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   const time = `${pad(date.getHours())}${pad(date.getMinutes())}`;
   const sc = score(state);
   const result = sc.won ? `${sc.total} ${t("res.fame")}` : t("over.lost");
-  return `对局/${d}-${time} ${t("game.title")} ${result}.md`;
+  return `${d}-${time} ${t("game.title")} ${result}.md`;
 }
 
 /** The game written up as a note: result, score, track, and the save to replay it. */

@@ -1,9 +1,0 @@
-{
-  "id": "boardroom-spike",
-  "name": "Boardroom Spike",
-  "version": "0.0.1",
-  "minAppVersion": "1.5.0",
-  "description": "Throwaway probe: what a game view can do on Obsidian mobile.",
-  "author": "luoxin9510",
-  "isDesktopOnly": false
-}
