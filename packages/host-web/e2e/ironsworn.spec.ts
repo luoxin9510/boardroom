@@ -135,3 +135,51 @@ test("rules page, assets, no sideways scroll, and deleting a campaign", async ({
   await page.getByTestId("delete-campaign").tap();
   await expect(page.getByTestId("campaign")).toHaveCount(0);
 });
+
+test("raise harm and use an asset ability after the roll, marking the combat track", async ({ page }) => {
+  await start(page);
+  await page.getByTestId("nav-character").tap();
+  await page.getByTestId("add-asset").tap();
+  await page.getByTestId("pick-lantern-moth").tap();
+  await page.getByTestId("nav-tracks").tap();
+  await page.getByTestId("new-track").tap();
+  await page.getByTestId("kind-vow").tap();
+  await page.getByTestId("track-name").fill("誓言");
+  await page.getByTestId("create-track").tap();
+  await page.getByTestId("new-track").tap();
+  await page.getByTestId("kind-combat").tap();
+  await page.getByTestId("track-name").fill("野狼");
+  await page.getByTestId("rank-formidable").tap();
+  await page.getByTestId("create-track").tap();
+  await rollWith(page, "hit", { d6: 6, c1: 1, c2: 1 });
+  await page.getByTestId("harm-up").tap();
+  await expect(page.getByTestId("harm")).toContainText("伤害 2");
+  // Only the combat track is offered, though a vow is open too.
+  await expect(page.getByTestId("res-strong-track")).toContainText("野狼");
+  await page.getByTestId("res-strong-apply").tap();
+  await expect(page.getByTestId("harm-up")).toBeDisabled();
+  await page.getByTestId("done").tap();
+  await page.getByTestId("nav-tracks").tap();
+  await expect(page.getByTestId("track-t2")).toContainText("2/10");
+  await expect(page.getByTestId("track-t1")).toContainText("0/10");
+});
+
+test("a consequence can't be taken twice by closing and reopening the roll", async ({ page }) => {
+  await start(page);
+  await rollWith(page, "probe", { d6: 6, c1: 1, c2: 2 });
+  await page.getByTestId("res-strong-apply").tap();
+  await page.locator(".br-sheet-backdrop").click({ position: { x: 10, y: 10 } });
+  await page.getByTestId("pending").tap();
+  await expect(page.getByTestId("res-strong-apply")).toBeDisabled();
+  await expect(page.getByTestId("meter-momentum")).toContainText("+4");
+});
+
+test("Ironsworn works offline once loaded", async ({ page, context }) => {
+  await expect(page.getByTestId("offline-ready")).toBeVisible({ timeout: 15_000 });
+  await context.setOffline(true);
+  await page.reload();
+  await start(page);
+  await page.getByTestId("nav-oracles").tap();
+  await page.getByTestId("ask-likely").tap();
+  await expect(page.getByTestId("oracle-result")).toBeVisible();
+});

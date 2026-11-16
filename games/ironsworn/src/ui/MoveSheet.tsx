@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Sheet, Stepper, useLang } from "@boardroom/ui";
 import { canBurn, judge, type Action, type State } from "../engine";
-import type { Atom } from "../effects";
+import { atomsOf, parseEffect, type Atom } from "../effects";
 import type { ContentPack, Move, Outcome, RollStat } from "../types";
 import { Consequence } from "./Consequence";
 import { pick, statName } from "./text";
@@ -27,8 +27,10 @@ export function MoveSheet(props: {
   const pending = state.pending && state.pending.move === move.id ? state.pending : null;
 
   const apply = (atoms: Atom[], amounts: number[], tr?: string) => props.act({ t: "effect", atoms, amounts, track: tr });
-  const consequence = (src: string, testid: string) => (
-    <Consequence src={src} state={state} pack={props.pack} apply={apply} openMove={props.openMove} rollOracle={props.rollOracle} testid={testid} />
+  // Combat moves mark the foe's (combat) track; progress moves their own kind.
+  const kind = move.track && move.track !== "bonds" ? move.track : move.category === "combat" ? "combat" : undefined;
+  const consequence = (src: string, testid: string, done?: boolean) => (
+    <Consequence key={`${move.id}:${testid}:${src}`} src={src} state={state} pack={props.pack} apply={apply} openMove={props.openMove} rollOracle={props.rollOracle} kind={kind} done={done} testid={testid} />
   );
 
   const statValue = (s: string) => (["health", "spirit", "supply"].includes(s) ? c[s as "health"] : c.stats[s as "edge"]);
@@ -55,6 +57,7 @@ export function MoveSheet(props: {
   };
 
   const outcome = pending?.outcome as Outcome | undefined;
+  const usesHarm = !!outcome && atomsOf(parseEffect(move.results[outcome]?.effect ?? "")).some((a) => a.k === "progress" && a.times === "harm");
   const burnTo = pending && canBurn(state) ? judge(pending.score, pending.c1, pending.c2, c.momentum) : null;
 
   return (
@@ -185,8 +188,26 @@ export function MoveSheet(props: {
               </button>
             )}
             <p>{pick(move.results[outcome]?.text, lang)}</p>
-            {move.results[outcome]?.effect ? <div key={`${outcome}-${pending.burned}`}>{consequence(move.results[outcome]?.effect ?? "", `res-${outcome}`)}</div> : null}
-            {pending.harm > 1 && <div className="iw-muted">{t("eff.harm", { n: pending.harm })}</div>}
+            {usesHarm && (
+              <div className="iw-row" data-testid="harm">
+                <span className="iw-label">{t("eff.harm", { n: pending.harm })}</span>
+                <button className="br-btn" disabled={pending.resolved} onClick={() => props.act({ t: "effect", atoms: [{ k: "harm", n: 1 }] })} data-testid="harm-up">
+                  {t("eff.harmUp")}
+                </button>
+              </div>
+            )}
+            {move.results[outcome]?.effect ? <div key={`${outcome}-${pending.burned}`}>{consequence(move.results[outcome]?.effect ?? "", `res-${outcome}`, pending.resolved)}</div> : null}
+            {related.length > 0 && (
+              <div className="iw-related">
+                <div className="iw-muted iw-small">{t("move.related")}</div>
+                {related.map((r, i) => (
+                  <div key={i} className="iw-small">
+                    <b>{r.asset}</b>：{r.text}
+                    {r.effect && consequence(r.effect, `asset-${i}`)}
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               className="br-btn is-block"
               onClick={() => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Sheet, Stepper, useLang } from "@boardroom/ui";
 import { boxes, momentumMax, momentumReset, ODDS, xpAvailable, type Action, type Entry, type Odds, type State } from "../engine";
 import { DEBILITIES, MOVE_CATEGORIES, RANKS, STATS, TRACK_KINDS, type Asset, type ContentPack, type Rank, type TrackKind } from "../types";
@@ -25,7 +25,6 @@ export function CharacterTab(props: { state: State; pack: ContentPack; act: Act 
   const c = props.state.character;
   const [statEdit, setStatEdit] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [name, setName] = useState(c.name);
   const groups = [
     ["conditions", ["wounded", "shaken", "unprepared", "encumbered"]],
     ["banes", ["maimed", "corrupted"]],
@@ -35,7 +34,7 @@ export function CharacterTab(props: { state: State; pack: ContentPack; act: Act 
     <div className="iw-tab" data-testid="tab-character">
       <label className="iw-row iw-namerow">
         <span className="iw-label">{t("char.name")}</span>
-        <input className="iw-input" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name !== c.name && props.act({ t: "name", name })} data-testid="char-name" />
+        <NameInput key={c.name} value={c.name} onCommit={(v) => props.act({ t: "name", name: v })} />
       </label>
 
       <div className="iw-label">{t("char.stats")}</div>
@@ -100,7 +99,7 @@ export function CharacterTab(props: { state: State; pack: ContentPack; act: Act 
               {def && <span className="iw-muted iw-small">{t(`assetcat.${def.category}`)}</span>}
             </div>
             {a.field !== undefined && (
-              <input className="iw-input" placeholder={def?.field ?? t("asset.field")} defaultValue={a.field} onBlur={(e) => e.target.value !== a.field && props.act({ t: "assetField", asset: a.id, value: e.target.value })} />
+              <input key={a.field} className="iw-input" placeholder={def?.field ?? t("asset.field")} defaultValue={a.field} onBlur={(e) => e.target.value !== a.field && props.act({ t: "assetField", asset: a.id, value: e.target.value })} />
             )}
             {a.health !== undefined && <Stepper label={t("asset.health")} value={a.health} min={0} max={def?.health ?? 5} onChange={(v) => props.act({ t: "assetHealth", asset: a.id, delta: v - (a.health as number) })} />}
             {(def?.abilities ?? []).map((ab, i) => (
@@ -130,6 +129,12 @@ export function CharacterTab(props: { state: State; pack: ContentPack; act: Act 
       {adding && <AssetPicker pack={props.pack} state={props.state} act={props.act} onClose={() => setAdding(false)} />}
     </div>
   );
+}
+
+/** A text field that commits on blur; keyed by the saved value so undo shows through. */
+function NameInput(props: { value: string; onCommit: (v: string) => void }) {
+  const [v, setV] = useState(props.value);
+  return <input className="iw-input" value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== props.value && props.onCommit(v)} data-testid="char-name" />;
 }
 
 function AssetPicker(props: { pack: ContentPack; state: State; act: Act; onClose: () => void }) {
@@ -331,17 +336,45 @@ export function OraclesTab(props: { pack: ContentPack; act: Act; last: Entry | u
 
 export function JournalTab(props: { journal: readonly Entry[]; notes: Note[]; pack: ContentPack; addNote: (text: string) => void; exportIt: () => void }) {
   const { t, lang } = useLang();
-  const [text, setText] = useState("");
-  const items: ({ k: "entry"; e: Entry; i: number } | { k: "note"; n: Note })[] = [];
-  const sorted = [...props.notes].sort((a, b) => a.at - b.at);
-  let n = 0;
-  props.journal.forEach((e, i) => {
-    while (n < sorted.length && (sorted[n] as Note).at <= i) items.push({ k: "note", n: sorted[n++] as Note });
-    items.push({ k: "entry", e, i });
-  });
-  while (n < sorted.length) items.push({ k: "note", n: sorted[n++] as Note });
+  // Typing a note doesn't re-render the journal: the input is its own component, the lines are memoised.
+  const lines = useMemo(() => {
+    const items: { key: string; note: boolean; text: string; kind: string }[] = [];
+    const sorted = [...props.notes].sort((a, b) => a.at - b.at);
+    let n = 0;
+    const note = (x: Note, k: number) => items.push({ key: `n${k}`, note: true, text: x.text, kind: "note" });
+    props.journal.forEach((e, i) => {
+      while (n < sorted.length && (sorted[n] as Note).at <= i) note(sorted[n] as Note, n++);
+      items.push({ key: `e${i}`, note: false, text: entryText(e, t, props.pack, lang), kind: e.k });
+    });
+    while (n < sorted.length) note(sorted[n] as Note, n++);
+    return items.reverse();
+  }, [props.journal, props.journal.length, props.notes, props.pack, t, lang]);
   return (
     <div className="iw-tab" data-testid="tab-journal">
+      <NoteInput addNote={props.addNote} exportIt={props.exportIt} />
+      {!lines.length && <p className="iw-muted">{t("journal.empty")}</p>}
+      <div className="iw-journal">
+        {lines.map((l) =>
+          l.note ? (
+            <p key={l.key} className="iw-jnote">
+              {l.text}
+            </p>
+          ) : (
+            <div key={l.key} className={`iw-jentry is-${l.kind}`}>
+              {l.text}
+            </div>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NoteInput(props: { addNote: (text: string) => void; exportIt: () => void }) {
+  const { t } = useLang();
+  const [text, setText] = useState("");
+  return (
+    <>
       <div className="iw-note-input">
         <textarea className="iw-input" rows={3} placeholder={t("journal.placeholder")} value={text} onChange={(e) => setText(e.target.value)} data-testid="note-text" />
         <div className="iw-row">
@@ -361,21 +394,7 @@ export function JournalTab(props: { journal: readonly Entry[]; notes: Note[]; pa
           </button>
         </div>
       </div>
-      {!items.length && <p className="iw-muted">{t("journal.empty")}</p>}
-      <div className="iw-journal">
-        {[...items].reverse().map((it, k) =>
-          it.k === "note" ? (
-            <p key={`n${k}`} className="iw-jnote">
-              {it.n.text}
-            </p>
-          ) : (
-            <div key={`e${it.i}`} className={`iw-jentry is-${it.e.k}`}>
-              {entryText(it.e, t, props.pack, lang)}
-            </div>
-          ),
-        )}
-      </div>
-    </div>
+    </>
   );
 }
 

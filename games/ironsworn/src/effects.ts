@@ -109,3 +109,21 @@ export function atomsOf(e: Effect | null): Atom[] {
   if (e.k === "choose") return e.options.flatMap(atomsOf);
   return [e];
 }
+
+/**
+ * The atoms a set of picks selects from an expression, or null while a choice is incomplete. Choice nodes are keyed
+ * by their path ("r", "r.0", "r.1.2", …); `picks[path]` lists the chosen option indexes.
+ */
+export function resolveChoice(e: Effect, picks: Record<string, number[]>, path = "r"): Atom[] | null {
+  if (e.k === "all") {
+    const parts = e.items.map((x, i) => resolveChoice(x, picks, `${path}.${i}`));
+    return parts.some((p) => p === null) ? null : (parts.flat() as Atom[]);
+  }
+  if (e.k === "choose") {
+    const sel = picks[path] ?? [];
+    if (e.n !== "any" && sel.length !== e.n) return null;
+    const parts = sel.map((i) => resolveChoice(e.options[i] as Effect, picks, `${path}.${i}`));
+    return parts.some((p) => p === null) ? null : (parts.flat() as Atom[]);
+  }
+  return [e];
+}

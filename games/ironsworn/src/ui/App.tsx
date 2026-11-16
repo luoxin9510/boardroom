@@ -49,7 +49,8 @@ async function listCampaigns(host: Host): Promise<{ path: string; file: Campaign
   for (const path of await host.listFiles(SAVE_DIR)) {
     try {
       const text = await host.readFile(path);
-      if (text) out.push({ path, file: JSON.parse(text) as CampaignFile });
+      const file = text ? (JSON.parse(text) as CampaignFile) : null;
+      if (file?.save?.updatedAt) out.push({ path, file });
     } catch {
       /* a broken file is skipped rather than hiding every campaign */
     }
@@ -118,7 +119,11 @@ function Game({ host }: { host: Host }) {
   };
 
   const remove = async (path: string) => {
-    await host.removeFile(path);
+    try {
+      await host.removeFile(path);
+    } catch (e) {
+      push(String(e), "bad");
+    }
     setList(await listCampaigns(host));
   };
 
@@ -321,7 +326,7 @@ function CampaignView(props: {
         </button>
       </header>
       <MetersBar state={state} act={props.act} />
-      <main className="iw-main">
+      <main className={`iw-main${state.pending && !moveDef ? " has-pending" : ""}`}>
         {tab === "character" && <CharacterTab state={state} pack={props.pack} act={props.act} />}
         {tab === "moves" && <MovesTab pack={props.pack} open={openMove} />}
         {tab === "tracks" && <TracksTab state={state} pack={props.pack} act={props.act} openMove={openMove} />}
@@ -335,10 +340,19 @@ function CampaignView(props: {
           </button>
         ))}
       </nav>
-      {moveDef && <MoveSheet move={moveDef} state={state} pack={props.pack} act={props.act} onClose={() => setMove(null)} openMove={openMove} rollOracle={rollOracle} />}
+      {moveDef && <MoveSheet key={moveDef.id} move={moveDef} state={state} pack={props.pack} act={props.act} onClose={() => setMove(null)} openMove={openMove} rollOracle={rollOracle} />}
       {!moveDef && state.pending && (
-        <button className="iw-pending" onClick={() => setMove(state.pending?.move ?? null)} data-testid="pending">
-          {t(`outcome.${state.pending.outcome}`)} · {t("move.done")}?
+        <button
+          className="iw-pending"
+          onClick={() => {
+            const id = state.pending?.move ?? null;
+            // A roll whose move the content pack no longer has can only be ended.
+            if (id && !props.pack.moves.some((m) => m.id === id)) props.act({ t: "endRoll" });
+            else setMove(id);
+          }}
+          data-testid="pending"
+        >
+          {props.pack.moves.some((m) => m.id === state.pending?.move) ? `${t(`outcome.${state.pending.outcome}`)} · ${t("move.done")}?` : t("move.endStale")}
         </button>
       )}
       {menu && (
