@@ -401,3 +401,14 @@ describe("tutorial game choice", () => {
     expect(tutorialGame(null).seed).toBe(TUTORIAL_SEED);
   });
 });
+
+describe("tutorial with an unusual pack", () => {
+  it("falls back to the built-in cards when the pack has no normal special card", async () => {
+    const { tutorialGame, TUTORIAL_SEED } = await import("../src/tutorial");
+    const p = parseContent(fixtureNotes());
+    const hardOnly = { ...p, specials: p.specials.map((s) => ({ ...s, difficulty: "hard" as const })) };
+    const g = tutorialGame(hardOnly);
+    expect(g.pack).not.toBe(hardOnly);
+    expect(g.seed).toBe(TUTORIAL_SEED);
+  });
+});

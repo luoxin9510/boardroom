@@ -14,9 +14,13 @@ export const tutorialPack = (): ContentPack => parseContent(TUTORIAL_NOTES);
  */
 export function tutorialGame(pack: ContentPack | null): { pack: ContentPack; seed: number } {
   if (pack) {
-    for (let seed = 1; seed <= 500; seed++) {
-      const t = targets(setup(pack, seed, { difficulty: "normal" }), "yellow");
-      if (t[0] === 0) return { pack, seed };
+    try {
+      for (let seed = 1; seed <= 500; seed++) {
+        const t = targets(setup(pack, seed, { difficulty: "normal" }), "yellow");
+        if (t[0] === 0) return { pack, seed };
+      }
+    } catch {
+      // A pack that can't set up a normal game (say, only hard special cards): the built-in cards still teach.
     }
   }
   return { pack: tutorialPack(), seed: TUTORIAL_SEED };

@@ -142,7 +142,7 @@ function Game({ host }: { host: Host }) {
     rerender();
   };
 
-  /** A guided game on the built-in tutorial cards. Leaves any saved game alone. */
+  /** A guided game on the player's own cards (built-in ones if those can't be used). Never saved; leaves any saved game alone. */
   const startTutorial = () => {
     const tg = tutorialGame(pack);
     session.current = new Session(makeEngine(tg.pack), GAME, tg.pack.hash, tg.seed, { difficulty: "normal" });
