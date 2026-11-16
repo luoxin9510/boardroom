@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Campaign, ContentError, langFromLocale, newSeed, RuleError, type CampaignSave, type Host, type Lang } from "@boardroom/core";
 import { LangProvider, RulesView, Sheet, Toasts, useLang, useToasts, useWakeLock } from "@boardroom/ui";
 import { FOLDERS, parseContent } from "../content";
@@ -74,6 +74,16 @@ function Game({ host }: { host: Host }) {
   const tRef = useRef(t);
   tRef.current = t;
   useWakeLock(true);
+  const portraits = useMemo<Portraits>(
+    () => ({
+      list: host.listImages(PORTRAITS).flatMap((path) => {
+        const url = host.imageUrl(path);
+        return url ? [{ path, url }] : [];
+      }),
+      url: (path) => (path ? host.imageUrl(path) : null),
+    }),
+    [host],
+  );
   // A new campaign opens the character wizard; the first visit ever shows a short how-to-play.
   const [fresh, setFresh] = useState(false);
   const [intro, setIntro] = useState(() => !host.getSetting<boolean>("iw.intro"));
@@ -193,13 +203,6 @@ function Game({ host }: { host: Host }) {
       </div>
     );
   if (!pack) return <div className="iw-screen" />;
-  const portraits: Portraits = {
-    list: host.listImages(PORTRAITS).flatMap((path) => {
-      const url = host.imageUrl(path);
-      return url ? [{ path, url }] : [];
-    }),
-    url: (path) => (path ? host.imageUrl(path) : null),
-  };
 
   const c = campaign.current;
   if (!c)
