@@ -5,6 +5,7 @@ import { atomsOf, parseEffect, type Atom } from "../effects";
 import type { ContentPack, Move, Outcome, RollStat } from "../types";
 import { Consequence } from "./Consequence";
 import { pick, statName } from "./text";
+import { Banner } from "./art";
 
 /** The rules page section that explains a move best. */
 export function ruleTopic(move: Move): string {
@@ -77,6 +78,7 @@ export function MoveSheet(props: {
   return (
     <Sheet title={pick(move.name, lang)} onClose={props.onClose} tall>
       <div className="iw-move" data-testid="move-sheet">
+        <Banner name={`类别-${move.category}`} />
         <p className="iw-trigger">{pick(move.trigger, lang)}</p>
         {props.openRules && (
           <button className="br-btn is-quiet iw-rulelink" onClick={() => props.openRules?.(ruleTopic(move))} data-testid="move-rules">

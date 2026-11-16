@@ -4,6 +4,7 @@ import type { Action, State } from "../engine";
 import { RANKS, STATS, type ContentPack, type Rank, type Stat } from "../types";
 import { AssetPicker } from "./Tabs";
 import { pick } from "./text";
+import { Banner } from "./art";
 
 type Step = "truths" | "stats" | "assets" | "bonds" | "background" | "inciting";
 const POOL = [3, 2, 2, 1, 1];
@@ -35,6 +36,7 @@ export function Wizard(props: {
   return (
     <Sheet title={`${t("wiz.title")} · ${t(`wiz.${step}`)}`} tall>
       <div className="iw-wiz" data-testid={`wiz-${step}`}>
+        <Banner name={`建角-${step}`} />
         <div className="iw-row">
           <span className="iw-muted iw-small iw-grow">{t("wiz.step", { n: i + 1, total: steps.length })}</span>
           <button className="br-btn is-quiet" onClick={() => props.openRules(topic[step])} data-testid="wiz-rules">

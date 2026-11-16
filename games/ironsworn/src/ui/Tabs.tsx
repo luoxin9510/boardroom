@@ -3,6 +3,7 @@ import { Sheet, Stepper, useLang } from "@boardroom/ui";
 import { boxes, momentumMax, momentumReset, ODDS, xpAvailable, type Action, type Entry, type Odds, type State } from "../engine";
 import { DEBILITIES, MOVE_CATEGORIES, RANKS, STATS, TRACK_KINDS, type Asset, type ContentPack, type Rank, type TrackKind } from "../types";
 import { entryText, pick, type Note } from "./text";
+import { Banner } from "./art";
 
 type Act = (a: Action) => boolean;
 
@@ -40,6 +41,7 @@ export function CharacterTab(props: { state: State; pack: ContentPack; act: Act;
   ] as const;
   return (
     <div className="iw-tab" data-testid="tab-character">
+      <Banner name="角色" />
       <div className="iw-row iw-charhead">
         <button className="iw-portrait is-large" onClick={() => setChoosing(true)} aria-label={t("char.portrait")} data-testid="portrait">
           {portraitUrl ? <img src={portraitUrl} alt="" /> : <span>＋</span>}
@@ -247,6 +249,7 @@ export function MovesTab(props: { pack: ContentPack; open: (id: string) => void 
   const { t, lang } = useLang();
   return (
     <div className="iw-tab" data-testid="tab-moves">
+      <Banner name="行动" />
       {MOVE_CATEGORIES.map((cat) => {
         const moves = props.pack.moves.filter((m) => m.category === cat);
         if (!moves.length) return null;
@@ -279,6 +282,7 @@ export function TracksTab(props: { state: State; pack: ContentPack; act: Act; op
   const tracks = [...props.state.tracks].sort((a, b) => Number(a.status !== "active") - Number(b.status !== "active"));
   return (
     <div className="iw-tab" data-testid="tab-tracks">
+      <Banner name="誓言" />
       <button className="br-btn is-block" onClick={() => setCreating(true)} data-testid="new-track">
         ＋ {t("track.new")}
       </button>
@@ -358,6 +362,7 @@ export function OraclesTab(props: { pack: ContentPack; act: Act; last: Entry | u
   const last = props.last && (props.last.k === "ask" || props.last.k === "oracle") ? props.last : undefined;
   return (
     <div className="iw-tab" data-testid="tab-oracles">
+      <Banner name="先知" />
       <div className="iw-label">{t("oracle.ask")}</div>
       <div className="iw-chips">
         {(Object.keys(ODDS) as Odds[]).map((o) => (
@@ -420,6 +425,7 @@ export function JournalTab(props: { journal: readonly Entry[]; notes: Note[]; pa
   }, [props.journal, props.journal.length, props.notes, props.pack, t, lang]);
   return (
     <div className="iw-tab" data-testid="tab-journal">
+      <Banner name="日志" />
       <NoteInput addNote={props.addNote} exportIt={props.exportIt} />
       {!lines.length && <p className="iw-muted">{t("journal.empty")}</p>}
       <div className="iw-journal">
