@@ -11,6 +11,8 @@ export interface Host {
   readFile(path: string): Promise<string | null>;
   /** Creates or replaces a file, creating folders as needed. */
   writeFile(path: string, text: string): Promise<void>;
+  /** Deletes a file; nothing happens if it doesn't exist. */
+  removeFile(path: string): Promise<void>;
   /** Paths of the files directly in `folder` (not recursive). */
   listFiles(folder: string): Promise<string[]>;
   /** Small per-device settings, such as the chosen language. */

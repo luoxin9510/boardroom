@@ -36,7 +36,7 @@ export function Shell(props: { offlineReady: boolean }) {
 
   const play = async (game: string, demo: boolean) => {
     try {
-      const pack = demo ? await demoPack() : await loadPack(game);
+      const pack = demo ? await demoPack(game) : await loadPack(game);
       const { host, dispose } = makeHost(pack, demo ? `${game}@demo` : game, back);
       setPlaying({ game, host, dispose });
     } catch (e) {
@@ -128,6 +128,9 @@ export function Shell(props: { offlineReady: boolean }) {
 
       <button className="br-btn is-block" onClick={() => void play("goblin-mountain", true)} data-testid="demo">
         {t("lib.demo")} · {GAMES["goblin-mountain"]?.title[lang]}
+      </button>
+      <button className="br-btn is-block" onClick={() => void play("ironsworn", true)} data-testid="demo-ironsworn">
+        {t("lib.demo")} · {GAMES["ironsworn"]?.title[lang]}
       </button>
       <p className="lib-muted lib-small">{t("lib.demoNote")}</p>
 

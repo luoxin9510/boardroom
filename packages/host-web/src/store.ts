@@ -72,6 +72,13 @@ export function put(store: StoreName, key: string, value: unknown): Promise<void
   });
 }
 
+export function remove(store: StoreName, key: string): Promise<void> {
+  return tx([store], "readwrite", (t) => {
+    t.objectStore(store).delete(key);
+    return () => undefined;
+  });
+}
+
 /** All entries whose key starts with `prefix`, read in one transaction. */
 export function entries<T>(store: StoreName, prefix: string): Promise<[string, T][]> {
   return tx([store], "readonly", (t) => {
