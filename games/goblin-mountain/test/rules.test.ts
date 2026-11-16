@@ -30,7 +30,7 @@ describe("content", () => {
     } catch (e) {
       expect(e).toBeInstanceOf(ContentError);
       expect((e as ContentError).file).toBe("卡牌/A.md");
-      expect((e as ContentError).line).toBe(10);
+      expect((e as ContentError).line).toBe(11);
       expect((e as ContentError).detail).toContain("宝藏加2");
     }
   });

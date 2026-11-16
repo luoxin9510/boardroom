@@ -3,6 +3,7 @@ type: tunnel
 card: 1
 side: E
 back: A
+image: 图/A.png
 ---
 
 | 位置 | English | 中文 | 条件 | 费用 | 奖励 | 奖励② | 可重复 |

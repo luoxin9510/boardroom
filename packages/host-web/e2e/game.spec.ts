@@ -75,6 +75,18 @@ test("undo, language switch, and continue after reload", async ({ page }) => {
   await expect(page.getByTestId("undo")).toBeDisabled();
 });
 
+test("card art shows for cards that have it, and a broken image falls back to text", async ({ page }) => {
+  await page.getByTestId("new-normal").tap();
+  // Fixture card 1 (sides A/E) has a placeholder image; the other cards have none.
+  const art = page.locator(".gm-strip.is-art img");
+  await expect(art).toHaveCount(4);
+  await expect(page.locator(".gm-strip.is-plain").first()).toBeVisible();
+  const height = await art.first().evaluate((img) => (img.parentElement as HTMLElement).getBoundingClientRect().height);
+  expect(height).toBeGreaterThan(100);
+  await art.first().evaluate((img) => ((img as HTMLImageElement).src = "/missing.png"));
+  await expect(art).toHaveCount(0);
+});
+
 test("nothing scrolls the page sideways and the tray stays on screen", async ({ page }) => {
   await page.getByTestId("new-normal").tap();
   const { scrollW, clientW } = await page.evaluate(() => ({ scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth }));

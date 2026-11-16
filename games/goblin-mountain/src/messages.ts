@@ -27,7 +27,7 @@ export const messages: Record<Lang, Messages> = {
     "start.rules": "规则要点在 vault 的「规则」文件夹里。",
 
     "hint.pickDie": "点一颗骰子，看它能去哪里",
-    "hint.pickTarget": "点一个发亮的地点放下 {die}",
+    "hint.pickTarget": "把{die}骰放到一个发亮的地点",
     "hint.noMove": "没有能走的地方：跳过这一回合，哥布林王前进 1 步",
     "hint.adjust": "开局前可以一次：一颗骰子 −1，另一颗 +1",
     "hint.kingHit": "哥布林王抓到了你的队伍：选一颗骰子承受这一下",
