@@ -49,18 +49,30 @@ test("undo, language switch, and continue after reload", async ({ page }) => {
   await page.getByTestId("new-hard").tap();
   await page.locator(".gm-tray .gm-die:not(.is-dim)").first().tap();
   await page.locator(".gm-slot.is-glow").first().tap();
-  if (await page.getByTestId("done").isVisible()) await page.getByTestId("done").tap();
+  // A location with an action opens a sheet; undo works from inside it too.
+  await expect(page.getByTestId("undo")).toBeEnabled(); // the move went through (the sheet, if any, renders with it)
+  if (await page.getByTestId("done").isVisible()) {
+    await page.getByTestId("sheet-undo").tap();
+    await expect(page.getByTestId("done")).toBeHidden();
+    await page.locator(".gm-tray .gm-die:not(.is-dim)").first().tap();
+    await page.locator(".gm-slot.is-glow").first().tap();
+    await page.getByTestId("done").tap();
+  }
   await expect(page.getByTestId("undo")).toBeEnabled();
   await page.getByTestId("menu").tap();
   await page.getByTestId("lang").tap();
   await expect(page.getByTestId("hint")).toContainText(/die|Goblin|move/i);
-  await page.mouse.click(10, 10); // close the menu sheet
+  await page.getByTestId("sheet").tap({ position: { x: 20, y: 20 } }); // tap the backdrop to close the menu
+  await expect(page.getByTestId("sheet")).toBeHidden();
   await page.reload();
   await page.getByTestId("continue").tap();
   await expect(page.getByTestId("undo")).toBeEnabled();
   await page.getByTestId("undo").tap();
-  await page.getByTestId("undo").tap().catch(() => {});
-  await expect(page.locator(".gm-tray .gm-die-status").first()).toBeVisible();
+  // Undo goes one step at a time: undoing "skip" reopens the action sheet, which has its own undo for the move.
+  if (await page.getByTestId("sheet-undo").isVisible()) await page.getByTestId("sheet-undo").tap();
+  // Back to the very start: every die at the entrance again.
+  await expect(page.locator(".gm-entrance .gm-chip")).toHaveCount(4);
+  await expect(page.getByTestId("undo")).toBeDisabled();
 });
 
 test("nothing scrolls the page sideways and the tray stays on screen", async ({ page }) => {

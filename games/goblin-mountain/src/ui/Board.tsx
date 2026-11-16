@@ -247,7 +247,7 @@ export function Board(props: BoardProps) {
           ) : (
             <>
               <button className="br-btn" disabled={s.phase !== "move" || s.fate === 0} onClick={() => setMode({ k: "fate" })} data-testid="fate">
-                {t("fate.title", { n: s.fate })}
+                {t("res.fate")} {s.fate}
               </button>
               {!s.started && !s.adjustUsed && (
                 <button className="br-btn" onClick={() => setMode({ k: "adjust" })}>
@@ -262,7 +262,7 @@ export function Board(props: BoardProps) {
         </div>
       </footer>
 
-      {s.phase === "action" && <ActionSheet s={s} act={act} />}
+      {s.phase === "action" && <ActionSheet s={s} act={act} canUndo={props.canUndo} undo={props.undo} />}
       {s.phase === "kingHit" && (
         <Sheet title={t("hint.kingHit")}>
           <div className="gm-row">
@@ -382,7 +382,7 @@ function Res(props: { k: string; v: number | string; t: (k: string) => string })
   );
 }
 
-function ActionSheet(props: { s: State; act: (a: Action) => boolean }) {
+function ActionSheet(props: { s: State; act: (a: Action) => boolean; canUndo: boolean; undo: () => void }) {
   const { s, act } = props;
   const { t, lang } = useLang();
   const loc = placedLocation(s);
@@ -407,6 +407,9 @@ function ActionSheet(props: { s: State; act: (a: Action) => boolean }) {
       )}
       <button className="br-btn is-block" onClick={() => act({ t: "done" })} data-testid="done">
         {s.acted > 0 ? t("action.done") : t("action.skip")}
+      </button>
+      <button className="br-btn is-quiet is-block" disabled={!props.canUndo} onClick={props.undo} data-testid="sheet-undo">
+        ↶ {t("menu.undo")}
       </button>
     </Sheet>
   );

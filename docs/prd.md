@@ -63,7 +63,7 @@ fixtures/
 ### 4.2 对局会话（core）
 
 - 一局 = 内容包版本 + 种子 + 选项 + 动作列表。
-- 撤销 = 去掉最后一个动作后从头重放；撤销不改变随机结果。
+- 撤销 = 回到最后一个动作之前的状态（与"去掉它后从头重放"结果相同，读档时就是这样重放的）；撤销不改变随机结果。一次撤销只退一个动作（比如先退"跳过"，再退移动）。
 - 存档：`对局/存档/<id>.json`，每个动作后写一次（防抖）；打开 vault 时可以「继续上一局」。
 - 结束：写一篇 `对局/<日期> <游戏> <结果>.md`，内容有结果、关键事件、种子和动作列表，链接到用到的卡牌笔记。
 
@@ -95,7 +95,7 @@ fixtures/
 
 - TypeScript，npm workspaces，React，esbuild 打插件，Vite 跑 host-web，vitest 跑测试，Playwright 跑 host-web 的 e2e（手机视口）。
 - GitHub 公开仓库 `luoxin9510/boardroom`，MIT。CI：类型检查、lint、单元测试、构建插件。
-- 安装到 vault：`npm run install:vault -- <vault 路径>`，把构建好的插件拷进 `<vault>/.obsidian/plugins/boardroom/`，iCloud 同步到手机。
+- 安装到 vault：`npm run install:vault -- <vault 路径>`，把构建好的插件拷进 `<vault>/.obsidian/plugins/boardroom/` 并启用，iCloud 同步到手机。加 `--fixtures` 会把原创测试卡一并拷进去（只用于测试 vault；已有 `卡牌/` 时拒绝覆盖）。
 - 流程：每个里程碑 spec → ticket → 分支 → PR → CI 绿 → 独立 Opus 审核 → 合并；里程碑之间停下来等作者用手机试玩。
 - 文档和代码同一个 PR 更新。
 
