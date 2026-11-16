@@ -3,10 +3,16 @@ import { ContentError } from "@boardroom/core";
 import { GAMES } from "./games";
 import * as store from "./store";
 
+/** One file of a pack. Kept as bytes (not Blobs) so importing makes few copies and WebKit can store it. */
+export interface PackFile {
+  type: string;
+  data: Uint8Array;
+}
+
 /** A content pack in memory: the game it is for and its files by path (卡牌/A.md, 卡牌/图/x.jpg, 规则/…). */
 export interface Pack {
   game: string;
-  files: Map<string, Blob>;
+  files: Map<string, PackFile>;
 }
 
 export interface PackInfo {
@@ -17,13 +23,23 @@ export interface PackInfo {
 }
 
 const TYPES: Record<string, string> = { md: "text/markdown", json: "application/json", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml" };
-const typeOf = (path: string) => TYPES[path.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
+export const typeOf = (path: string) => TYPES[path.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
 
 export class PackError extends Error {}
 
-interface StoredFile {
-  type: string;
-  data: ArrayBuffer;
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+
+/**
+ * Zip tools that don't mark names as UTF-8 (Finder's "Compress" among them) make fflate read them as
+ * Latin-1, so 卡牌 comes out garbled. If a name's Latin-1 bytes are valid UTF-8, use that reading.
+ */
+export function fixName(name: string): string {
+  if (!/[\u0080-ÿ]/.test(name) || /[^\u0000-ÿ]/.test(name)) return name;
+  try {
+    return utf8.decode(Uint8Array.from(name, (c) => c.charCodeAt(0)));
+  } catch {
+    return name;
+  }
 }
 
 /**
@@ -37,62 +53,56 @@ export function readZip(data: Uint8Array): Pack {
   } catch {
     throw new PackError("not a zip file");
   }
-  const config = Object.keys(raw)
-    .filter((p) => p.split("/").pop() === "boardroom.json")
-    .sort((a, b) => a.length - b.length)[0];
+  const named = new Map(Object.entries(raw).map(([name, bytes]) => [fixName(name), bytes]));
+  const config = [...named.keys()].filter((p) => p.split("/").pop() === "boardroom.json").sort((a, b) => a.length - b.length)[0];
   if (!config) throw new PackError("no boardroom.json in the zip");
   const root = config.slice(0, -"boardroom.json".length);
   let game: unknown;
   try {
-    game = (JSON.parse(strFromU8(raw[config] as Uint8Array)) as { game?: unknown }).game;
+    game = (JSON.parse(strFromU8(named.get(config) as Uint8Array)) as { game?: unknown }).game;
   } catch {
     throw new PackError("boardroom.json is not valid JSON");
   }
   if (typeof game !== "string" || !GAMES[game]) throw new PackError(`unknown game "${String(game)}" in boardroom.json`);
-  const files = new Map<string, Blob>();
-  for (const [p, bytes] of Object.entries(raw)) {
+  const files = new Map<string, PackFile>();
+  for (const [p, bytes] of named) {
     if (!p.startsWith(root) || p === config) continue;
     const path = p.slice(root.length);
-    files.set(path, new Blob([bytes as BlobPart], { type: typeOf(path) }));
+    files.set(path, { type: typeOf(path), data: bytes });
   }
   return { game, files };
 }
 
 /** The markdown notes of a pack, for the game's parser. */
-export async function notesOf(pack: Pack): Promise<{ path: string; text: string }[]> {
-  const out: { path: string; text: string }[] = [];
-  for (const [path, blob] of pack.files) if (path.endsWith(".md")) out.push({ path, text: await blob.text() });
-  return out;
+export function notesOf(pack: Pack): { path: string; text: string }[] {
+  const dec = new TextDecoder();
+  return [...pack.files].filter(([path]) => path.endsWith(".md")).map(([path, f]) => ({ path, text: dec.decode(f.data) }));
 }
 
-/** Checks the pack with the game's own parser, then replaces any earlier pack for that game. */
+/** Checks the pack with the game's own parser, then replaces any earlier pack for that game, all or nothing. */
 export async function importPack(pack: Pack): Promise<PackInfo> {
   const def = GAMES[pack.game];
   if (!def) throw new PackError(`unknown game "${pack.game}"`);
   try {
-    def.check(await notesOf(pack));
+    def.check(notesOf(pack));
   } catch (e) {
     if (e instanceof ContentError) throw new PackError(e.message);
     throw e;
   }
   let bytes = 0;
-  const items: [string, unknown][] = [];
-  for (const [path, blob] of pack.files) {
-    bytes += blob.size;
-    // Stored as bytes, not Blobs: WebKit can't keep Blobs in IndexedDB in private browsing.
-    const stored: StoredFile = { type: blob.type, data: await blob.arrayBuffer() };
-    items.push([`${pack.game}/${path}`, stored]);
+  const items: [string, PackFile][] = [];
+  for (const [path, f] of pack.files) {
+    bytes += f.data.byteLength;
+    items.push([`${pack.game}/${path}`, f]);
   }
-  await store.clear("content", `${pack.game}/`);
-  await store.putAll("content", items);
   const info: PackInfo = { game: pack.game, importedAt: new Date().toISOString(), files: pack.files.size, bytes };
-  await store.put("packs", pack.game, info);
+  await store.replacePack(pack.game, items, info);
   return info;
 }
 
 export async function loadPack(game: string): Promise<Pack> {
-  const files = new Map<string, Blob>();
-  for (const [key, f] of await store.entries<StoredFile>("content", `${game}/`)) files.set(key.slice(game.length + 1), new Blob([f.data], { type: f.type }));
+  const files = new Map<string, PackFile>();
+  for (const [key, f] of await store.entries<PackFile>("content", `${game}/`)) files.set(key.slice(game.length + 1), f);
   return { game, files };
 }
 
@@ -100,7 +110,7 @@ export async function listPacks(): Promise<PackInfo[]> {
   return (await store.entries<PackInfo>("packs", "")).map(([, v]) => v);
 }
 
-export async function deletePack(game: string): Promise<void> {
-  await store.clear("content", `${game}/`);
-  await store.del("packs", game);
+/** Removes a game's content and its record together. Saves are kept. */
+export function deletePack(game: string): Promise<void> {
+  return store.replacePack(game, [], null);
 }

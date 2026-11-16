@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { zipSync } from "fflate";
+import { stripUtf8Flag } from "../test/zip-names";
 
 /** Plays legal moves until the game ends: always the first usable die and its first target, doing every action. */
 async function playToEnd(page: Page) {
@@ -142,8 +143,10 @@ function fixturePack(top = ""): Buffer {
     }
   };
   walk(root);
-  if (top) files["__MACOSX/._junk"] = new Uint8Array([0]);
-  return Buffer.from(zipSync(files));
+  if (!top) return Buffer.from(zipSync(files));
+  // Like Finder's Compress: a top folder, __MACOSX junk, and names not marked as UTF-8.
+  files["__MACOSX/._junk"] = new Uint8Array([0]);
+  return Buffer.from(stripUtf8Flag(zipSync(files)));
 }
 
 test("imports a content pack, plays from it, and survives a reload", async ({ page }) => {

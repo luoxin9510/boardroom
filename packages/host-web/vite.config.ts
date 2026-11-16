@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { createHash } from "node:crypto";
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 /**
@@ -16,13 +16,19 @@ function serviceWorker(): Plugin {
     name: "boardroom-sw",
     apply: "build",
     generateBundle(_options, bundle) {
-      const files = ["./", ...Object.keys(bundle), ...walk(publicDir)].filter((f) => !f.endsWith(".map")).map((f) => (f === "./" ? f : `./${f}`));
-      const version = createHash("sha256").update(files.join("\n")).digest("hex").slice(0, 12);
+      const published = walk(publicDir);
+      const files = ["./", ...Object.keys(bundle), ...published].filter((f) => !f.endsWith(".map")).map((f) => (f === "./" ? f : `./${f}`));
+      // The version covers file contents, not just names: a change to index.html, the manifest or an icon is a new version too.
+      const hash = createHash("sha256");
+      for (const [name, out] of Object.entries(bundle)) hash.update(name).update(out.type === "chunk" ? out.code : out.source);
+      for (const f of published) hash.update(f).update(readFileSync(join(publicDir, f)));
+      const version = hash.digest("hex").slice(0, 12);
       const source = `// Generated at build time (vite.config.ts). Cache-first, offline after the first visit.
 const CACHE = "boardroom-${version}";
 const FILES = ${JSON.stringify(files)};
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache: "reload" skips the HTTP cache, so a new version never stores a stale index.html (GitHub Pages caches it for 10 minutes).
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith("boardroom-") && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));

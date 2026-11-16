@@ -35,9 +35,13 @@ export function Shell(props: { offlineReady: boolean }) {
   };
 
   const play = async (game: string, demo: boolean) => {
-    const pack = demo ? await demoPack() : await loadPack(game);
-    const { host, dispose } = makeHost(pack, demo ? `${game}@demo` : game, back);
-    setPlaying({ game, host, dispose });
+    try {
+      const pack = demo ? await demoPack() : await loadPack(game);
+      const { host, dispose } = makeHost(pack, demo ? `${game}@demo` : game, back);
+      setPlaying({ game, host, dispose });
+    } catch (e) {
+      setNote({ text: String(e), bad: true });
+    }
   };
 
   const onFile = async (file: File | undefined) => {
@@ -59,14 +63,20 @@ export function Shell(props: { offlineReady: boolean }) {
   const remove = async (game: string) => {
     if (confirm !== game) return setConfirm(game);
     setConfirm(null);
-    await deletePack(game);
+    try {
+      await deletePack(game);
+    } catch (e) {
+      setNote({ text: String(e), bad: true });
+    }
     refresh();
   };
 
   const backup = async () => {
     const all = Object.fromEntries(await store.entries<string>("files", ""));
     const date = new Date().toISOString().slice(0, 10);
-    await shareText(`boardroom-saves-${date}.json`, JSON.stringify(all), "application/json").catch(() => {});
+    await shareText(`boardroom-saves-${date}.json`, JSON.stringify(all), "application/json").catch((e: unknown) => {
+      if ((e as Error)?.name !== "AbortError") setNote({ text: String(e), bad: true });
+    });
   };
 
   if (playing) {
@@ -112,6 +122,7 @@ export function Shell(props: { offlineReady: boolean }) {
         {t("lib.import")}
         <input ref={fileInput} type="file" accept=".zip,application/zip" disabled={busy} onChange={(e) => void onFile(e.target.files?.[0])} data-testid="import" />
       </label>
+      {!standalone && <p className="lib-warn" data-testid="install-first">{t("lib.installFirst")}</p>}
       {note && <div className={`lib-note${note.bad ? " is-bad" : ""}`} data-testid="lib-note">{note.text}</div>}
       <p className="lib-muted lib-small">{t("lib.howto")}</p>
 

@@ -29,12 +29,12 @@ export const deviceLocale = () => new URLSearchParams(location.search).get("lang
  */
 export function makeHost(pack: Pack, space: string, exit: () => void): { host: Host; dispose: () => void } {
   const urls = new Map<string, string>();
-  for (const [path, blob] of pack.files) if (blob.type.startsWith("image/")) urls.set(path, URL.createObjectURL(blob));
+  for (const [path, f] of pack.files) if (f.type.startsWith("image/")) urls.set(path, URL.createObjectURL(new Blob([f.data as BlobPart], { type: f.type })));
   const notes = notesOf(pack);
   const key = (path: string) => `${space}/${path}`;
   const host: Host = {
     async readNotes(folder) {
-      return (await notes).filter((n) => n.path.startsWith(`${folder}/`));
+      return notes.filter((n) => n.path.startsWith(`${folder}/`));
     },
     imageUrl: (path) => urls.get(path) ?? null,
     async readFile(path) {
@@ -59,12 +59,19 @@ export function makeHost(pack: Pack, space: string, exit: () => void): { host: H
   return { host, dispose: () => urls.forEach((u) => URL.revokeObjectURL(u)) };
 }
 
-/** The share sheet where the browser can share files (iPhone), otherwise a download. */
+/**
+ * The share sheet where the browser can share files (iPhone), otherwise a download. If sharing is refused
+ * (e.g. the tap is too long ago after reading storage), falls back to the download; closing the sheet is not an error.
+ */
 export async function shareText(name: string, text: string, type: string): Promise<void> {
   const file = new File([text], name, { type });
   if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-    await navigator.share({ files: [file], title: name });
-    return;
+    try {
+      await navigator.share({ files: [file], title: name });
+      return;
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") throw e;
+    }
   }
   const url = URL.createObjectURL(file);
   const a = document.createElement("a");

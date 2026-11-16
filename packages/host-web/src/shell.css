@@ -64,6 +64,11 @@ body,
 .lib-import.is-busy {
   opacity: 0.5;
 }
+.lib-warn {
+  margin: 0;
+  font-size: 13px;
+  color: var(--br-accent);
+}
 .lib-note {
   padding: 10px 12px;
   border-radius: 10px;
