@@ -159,14 +159,18 @@ function Game({ host }: { host: Host }) {
     void host.setSetting("tutorialSeen", true);
   };
 
+  /** Leaves the current game for the start screen. A real game is marked finished; a tutorial game never touched the saves. */
   const abandon = () => {
+    const wasTutorial = tutorial.current;
     save(true);
     tutorial.current = false;
     setTutStep(null);
     session.current = null;
-    setLatest(null);
+    if (!wasTutorial) setLatest(null);
     setMenu("none");
     rerender();
+    // Once the save queue is written, look again: "continue" must reflect what is really stored.
+    void writes.current.then(() => findLatest(host)).then(setLatest);
   };
 
   /** Exports the game as a markdown note (share sheet or download), ready to drop into a vault. */

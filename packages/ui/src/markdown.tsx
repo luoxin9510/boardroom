@@ -66,7 +66,8 @@ export function parseBlocks(body: string): Block[] {
       flush();
       out.push({ k: "topic", id: m[1] as string });
       i++;
-    } else if (t.startsWith("<!--")) {
+    } else if (t.startsWith("<!--") && lines.slice(i).some((l) => l.includes("-->"))) {
+      // A comment, possibly over several lines; an unclosed one is left as text rather than hiding the rest.
       flush();
       while (i < lines.length && !(lines[i] as string).includes("-->")) i++;
       i++;
@@ -123,6 +124,15 @@ export function parseBlocks(body: string): Block[] {
   return out;
 }
 
+/** decodeURIComponent that keeps the text as it is when it isn't valid (a file named "50% off.png"). */
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 /** Inline markup to React nodes. */
 export function inline(text: string, ctx: MdContext, key = "i"): ReactNode[] {
   const out: ReactNode[] = [];
@@ -137,7 +147,7 @@ export function inline(text: string, ctx: MdContext, key = "i"): ReactNode[] {
     let x: RegExpExecArray | null;
     if (tok === "\n") out.push(<br key={k} />);
     else if ((x = /^!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/.exec(tok)) || (x = /^!\[[^\]]*\]\(([^)]+)\)$/.exec(tok))) {
-      const src = ctx.image(decodeURIComponent((x[1] as string).trim()).split("/").pop() as string);
+      const src = ctx.image(safeDecode((x[1] as string).trim()).split("/").pop() as string);
       if (src) out.push(<img key={k} className="br-md-img is-inline" src={src} alt="" />);
     } else if ((x = /^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/.exec(tok))) out.push((x[2] ?? x[1] ?? "").trim());
     else if ((x = /^\[([^\]]+)\]\(rule:([\w-]+)\)$/.exec(tok))) {

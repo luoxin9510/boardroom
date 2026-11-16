@@ -25,15 +25,15 @@ export function Coach(props: { view: CoachView; step: number; onStep: (n: number
   // Follow the highlighted element (it may scroll or appear a moment later).
   useLayoutEffect(() => {
     if (!step?.target) return setBox(null);
-    let raf = 0;
+    // A few times a second is enough to follow scrolling and sheets opening, and cheap on a phone.
     const measure = () => {
       const el = document.querySelector(step.target as string);
       const r = el?.getBoundingClientRect() ?? null;
       setBox((b) => (r && b && r.x === b.x && r.y === b.y && r.width === b.width && r.height === b.height ? b : r));
-      raf = requestAnimationFrame(measure);
     };
     measure();
-    return () => cancelAnimationFrame(raf);
+    const timer = setInterval(measure, 150);
+    return () => clearInterval(timer);
   }, [step]);
 
   if (!step) return null;

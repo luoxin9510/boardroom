@@ -376,3 +376,13 @@ describe("tutorial", () => {
       for (const text of Object.values(table)) for (const m of String(text).matchAll(/\]\(rule:([\w-]+)\)/g)) expect(defined, m[1]).toContain(m[1]);
   });
 });
+
+describe("tutorial cards", () => {
+  it("match the test cards they were generated from (minus images)", async () => {
+    const { TUTORIAL_NOTES } = await import("../src/tutorial-cards");
+    const fresh = fixtureNotes()
+      .map((n) => ({ path: n.path, text: n.text.replace(/^image: .*\n/m, "") }))
+      .sort((a, b) => a.path.localeCompare(b.path));
+    expect([...TUTORIAL_NOTES].sort((a, b) => a.path.localeCompare(b.path))).toEqual(fresh);
+  });
+});

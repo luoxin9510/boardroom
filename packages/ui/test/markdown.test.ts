@@ -54,3 +54,16 @@ describe("markdown for rules notes", () => {
     expect(pickRules([other], "zh")).toBeNull();
   });
 });
+
+describe("odd markdown doesn't break the page", () => {
+  it("keeps image names with a stray % instead of throwing", async () => {
+    const { inline } = await import("../src");
+    const seen: string[] = [];
+    const ctx = { image: (n: string) => (seen.push(n), null), note: () => null };
+    expect(() => inline("看 ![](50%off.png) 和 ![[100% 地图.png]]", ctx)).not.toThrow();
+    expect(seen).toEqual(["50%off.png", "100% 地图.png"]);
+  });
+  it("shows text after an unclosed comment", () => {
+    expect(parseBlocks("<!-- oops\n\n正文").map((b) => b.k)).toEqual(["p", "p"]);
+  });
+});

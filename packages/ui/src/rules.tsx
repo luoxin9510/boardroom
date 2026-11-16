@@ -54,7 +54,9 @@ export function RulesView(props: {
 }) {
   const rules = useMemo(() => pickRules(props.notes, props.lang), [props.notes, props.lang]);
   const secs = useMemo(() => (rules ? sections(rules.body) : []), [rules]);
-  const [topic, setTopic] = useState(props.topic ?? null);
+  // A counter with the topic, so tapping the same link again still jumps.
+  const [jump, setJump] = useState<{ topic: string | null; n: number }>({ topic: props.topic ?? null, n: 0 });
+  const topic = jump.topic;
   const [open, setOpen] = useState<Set<number>>(() => new Set());
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -69,7 +71,7 @@ export function RulesView(props: {
       el?.scrollIntoView({ block: "start", behavior: "smooth" });
     }, 30);
     return () => clearTimeout(t);
-  }, [topic, secs]);
+  }, [jump, secs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ctx: MdContext = {
     image: props.image,
@@ -77,7 +79,7 @@ export function RulesView(props: {
       const n = props.notes.find((x) => x.path.split("/").pop()?.replace(/\.md$/, "") === name);
       return n ? n.text : null;
     },
-    onTopic: (t) => setTopic(t),
+    onTopic: (t) => setJump((j) => ({ topic: t, n: j.n + 1 })),
   };
 
   return (

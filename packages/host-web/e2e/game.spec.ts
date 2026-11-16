@@ -228,3 +228,20 @@ test("rules open from the start screen and jump to a topic from a hint", async (
   await page.getByTestId("rules-close").tap();
   await expect(page.getByTestId("rules")).toHaveCount(0);
 });
+
+test("a tutorial leaves the saved game's continue in place", async ({ page }) => {
+  await demo(page);
+  await page.getByTestId("first-run-no").tap();
+  await page.getByTestId("new-normal").tap();
+  await page.locator(".gm-tray .gm-die:not(.is-dim)").first().tap();
+  await page.locator(".gm-slot.is-glow").first().tap();
+  if (await page.getByTestId("done").isVisible()) await page.getByTestId("done").tap();
+  await page.reload();
+  await demo(page);
+  await expect(page.getByTestId("continue")).toBeVisible();
+  await page.getByTestId("tutorial").tap();
+  await page.getByTestId("coach-skip").tap();
+  await page.getByTestId("menu").tap();
+  await page.getByText("放弃这局，重新开始").tap();
+  await expect(page.getByTestId("continue")).toBeVisible();
+});
