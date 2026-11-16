@@ -392,3 +392,15 @@ describe("more consequence words", () => {
     expect(c.state.character.assets[0]?.health).toBe(3);
   });
 });
+
+describe("saves from before the bonus field", () => {
+  it("replay without falling back", () => {
+    const c = campaign();
+    c.act({ t: "roll", move: "probe", stat: "edge", dice: { d6: 3, c1: 9, c2: 9 } });
+    c.act({ t: "endRoll" });
+    const save = JSON.parse(JSON.stringify(c.toSave()));
+    expect("bonus" in save.state).toBe(false);
+    const { fellBack } = Campaign.fromSave(makeEngine(pack()), save);
+    expect(fellBack).toBeNull();
+  });
+});

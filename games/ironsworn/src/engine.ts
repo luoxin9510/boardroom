@@ -295,7 +295,8 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           need(stat && m.stats.includes(stat), "err.statNotAllowed");
           need(Number.isInteger(action.adds ?? 0) && (action.adds ?? 0) >= 0 && (action.adds ?? 0) <= 10, "err.adds");
           const adds = (action.adds ?? 0) + (s.bonus ?? 0);
-          s.bonus = 0;
+          // Deleted rather than zeroed, so replaying an older save (no "bonus" field) gives the same state.
+          delete s.bonus;
           const d6 = die(s, 6, action.dice?.d6);
           const c1 = die(s, 10, action.dice?.c1);
           const c2 = die(s, 10, action.dice?.c2);
@@ -401,8 +402,11 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
                 break;
               case "recommit": {
                 const t = progressTrack();
+                need(t.status === "active", "err.trackClosed");
+                const from = t.ticks;
                 t.ticks = Math.min(Math.floor(t.ticks / 4), 1) * 4;
                 t.rank = RANKS[Math.min(RANKS.indexOf(t.rank) + 1, RANKS.length - 1)] as Rank;
+                log({ k: "track", track: { ...t }, change: "mark", from });
                 break;
               }
               case "companion": {

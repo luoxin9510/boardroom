@@ -114,7 +114,10 @@ function parseAtom(s: string): Atom {
   if ((m = /^next\+(\d+)$/.exec(s))) return { k: "next", n: Number(m[1]) };
   if (s === "recommit") return { k: "recommit" };
   if ((m = /^companion([+-])(\d+|\?)$/.exec(s))) return { k: "companion", delta: m[2] === "?" ? (m[1] === "-" ? "-ask" : "ask") : (m[1] === "-" ? -1 : 1) * Number(m[2]) };
-  if ((m = /^「([^」]+)」$/.exec(s))) return { k: "note", text: (m[1] as string).trim() };
+  if ((m = /^「([^」]*)」$/.exec(s))) {
+    if (!(m[1] as string).trim()) throw new EffectError(`empty story option 「」 in "${s}"`);
+    return { k: "note", text: (m[1] as string).trim() };
+  }
   if ((m = /^harm\+(\d+)$/.exec(s))) return { k: "harm", n: Number(m[1]) };
   if ((m = /^(move|oracle):([a-z0-9-]+)$/.exec(s))) return { k: m[1] as "move", id: m[2] as string };
   throw new EffectError(`"${s}" is not a known consequence (e.g. momentum+1, health-?, progress×harm, move:id, 二选一(A | B))`);
