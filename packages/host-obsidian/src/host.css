@@ -11,3 +11,11 @@ body.boardroom-immersive .mobile-toolbar {
 .boardroom-mount {
   height: 100%;
 }
+/* On phones the game covers the whole screen and handles the safe areas itself; otherwise Obsidian's
+   own top spacing and ours add up (seen on iPhone: an empty band above the game). */
+body.is-mobile.boardroom-immersive .workspace-leaf-content[data-type="boardroom-game"] .boardroom-mount {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  height: auto;
+}

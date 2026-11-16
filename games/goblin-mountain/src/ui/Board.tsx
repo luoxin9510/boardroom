@@ -49,6 +49,8 @@ export function Board(props: BoardProps) {
   // A new state from the engine resets transient selection.
   useEffect(() => setMode((m) => (m.k === "info" || m.k === "fate" ? m : { k: "idle" })), [s]);
 
+  const artWidth = useArtWidth(s, props.imageUrl, trackRef);
+
   const selected = mode.k === "selected" ? mode.color : null;
   const legal = useMemo(() => (selected ? targets(s, selected) : []), [s, selected]);
   const king = kingWhere(s);
@@ -157,7 +159,7 @@ export function Board(props: BoardProps) {
       </header>
 
       <div className="gm-track" ref={trackRef} data-testid="track">
-        <Slot refKey="start" refs={slotRefs} king={king === -1} onTap={() => tapSlot("start")} wide>
+        <Slot refKey="start" refs={slotRefs} onTap={() => tapSlot("start")} wide>
           <div className="gm-entrance">
             <div className="gm-entrance-title">{t("track.entrance")}</div>
             <div className="gm-warrens">
@@ -178,9 +180,11 @@ export function Board(props: BoardProps) {
           const d = dieAt(s, i);
           const layout = s.layout.find((l) => l.side === loc.side);
           const special = layout?.special ?? false;
+          const image = layout?.image ? props.imageUrl(`${CARD_FOLDER}/${layout.image}`) : null;
           return (
-            <Slot key={i} refKey={String(i)} refs={slotRefs} king={king === i} onTap={() => tapSlot(i)} glow={legal.includes(i)} special={special} cardStart={loc.index === 0} testId={`slot-${i}`}>
-              <Strip loc={loc} image={layout?.image ? props.imageUrl(`${CARD_FOLDER}/${layout.image}`) : null} strips={layout?.strips} />
+            <Slot key={i} refKey={String(i)} refs={slotRefs} king={king === i} onTap={() => tapSlot(i)} glow={legal.includes(i)} special={special} cardStart={loc.index === 0} testId={`slot-${i}`} width={image ? artWidth : undefined}>
+              <Strip loc={loc} image={image} strips={layout?.strips} />
+              {image && <div className="gm-caption">{locName(loc, lang)}</div>}
               <div className="gm-slot-foot">
                 {d ? (
                   <DieChip color={d} strength={s.dice[d].strength} selected={selected === d || (mode.k === "fatePick" && mode.first === d) || (mode.k === "adjust" && mode.minus === d)} onTap={() => tapSlot(i)} />
@@ -308,6 +312,35 @@ export function Board(props: BoardProps) {
   );
 }
 
+const STRIP_CHROME = 22 + 4 + 52 + 4 + 20 + 4 + 8 + 16; // king row, foot, caption, gaps, borders, track padding
+
+/** Slot width for card art: the strip's height (what the track leaves) times the card's strip proportions. */
+function useArtWidth(s: State, imageUrl: (p: string) => string | null, trackRef: React.RefObject<HTMLDivElement>): { width: number; strip: number } | undefined {
+  const [ratio, setRatio] = useState<number | null>(null);
+  const [height, setHeight] = useState(0);
+  const first = s.layout.find((l) => l.image && !l.special);
+  const url = first?.image ? imageUrl(`${CARD_FOLDER}/${first.image}`) : null;
+  useEffect(() => {
+    if (!url) return;
+    const img = new Image();
+    img.onload = () => img.naturalHeight && setRatio(img.naturalWidth / 4 / img.naturalHeight);
+    img.src = url;
+  }, [url]);
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setHeight(el.clientHeight));
+    ro.observe(el);
+    setHeight(el.clientHeight);
+    return () => ro.disconnect();
+  }, [trackRef]);
+  if (!ratio || !height) return undefined;
+  // About three locations on screen: the width is capped, and the strip's height follows the card's proportions.
+  const room = Math.min(height, 560) - STRIP_CHROME;
+  const width = Math.round(Math.max(96, Math.min(126, room * ratio + 8)));
+  return { width, strip: Math.min(room, Math.round((width - 8) / ratio)) };
+}
+
 function Slot(props: {
   refKey: string;
   refs: React.MutableRefObject<Map<string, HTMLDivElement>>;
@@ -319,6 +352,8 @@ function Slot(props: {
   special?: boolean;
   cardStart?: boolean;
   testId?: string;
+  /** Width for card-art slots, so a location strip keeps the card's proportions. */
+  width?: { width: number; strip: number };
 }) {
   return (
     <div
@@ -329,6 +364,7 @@ function Slot(props: {
       className={`gm-slot${props.glow ? " is-glow" : ""}${props.wide ? " is-wide" : ""}${props.special ? " is-special" : ""}${props.cardStart ? " is-card-start" : ""}`}
       onClick={props.onTap}
       data-testid={props.testId}
+      style={props.width ? ({ flexBasis: props.width.width, "--gm-strip-h": `${props.width.strip}px` } as React.CSSProperties) : undefined}
     >
       <div className="gm-slot-king">{props.king ? "♛" : ""}</div>
       {props.children}
@@ -344,11 +380,16 @@ function Strip(props: { loc: LocationDef; image: string | null; strips?: number[
   const a = x[loc.index] ?? 0;
   const b = x[loc.index + 1] ?? 1;
   const f = b - a;
-  const style = props.image
-    ? { backgroundImage: `url("${props.image}")`, backgroundSize: `${100 / f}% 100%`, backgroundPosition: `${f >= 1 ? 0 : (a / (1 - f)) * 100}% 0` }
-    : undefined;
+  if (props.image) {
+    // The card art already shows the name, requirement and reward; the caption below gives the name in the chosen language.
+    return (
+      <div className="gm-strip is-art">
+        <img src={props.image} alt={locName(loc, lang)} draggable={false} style={{ transform: `translateX(-${(a + f / 2) * 100}%)` }} />
+      </div>
+    );
+  }
   return (
-    <div className={`gm-strip${props.image ? "" : " is-plain"}`} style={style}>
+    <div className="gm-strip is-plain">
       <span className={`gm-req${loc.req.color ? ` is-${loc.req.color}` : ""}`}>{reqText(loc.req, t)}</span>
       <div className="gm-strip-text">
         <div className="gm-strip-name">{locName(loc, lang)}</div>
