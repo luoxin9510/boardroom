@@ -77,7 +77,7 @@ test("harm before the roll, a choice on a miss, and the debility it marks", asyn
   await page.getByTestId("dice-c1").fill("9");
   await page.getByTestId("dice-c2").fill("10");
   await page.getByTestId("roll").tap();
-  await expect(page.getByTestId("outcome")).toHaveText("失手");
+  await expect(page.getByTestId("outcome")).toHaveText("失败");
   await expect(page.getByTestId("res-miss-apply")).toBeDisabled();
   await page.getByTestId("res-miss-opt-0").tap();
   await page.getByTestId("res-miss-apply").tap();
