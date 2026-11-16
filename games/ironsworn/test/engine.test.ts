@@ -342,3 +342,53 @@ describe("asset abilities on a roll", () => {
     expect(() => c.act({ t: "effect", atoms: [{ k: "harm", n: 1 }] })).toThrow();
   });
 });
+
+describe("more consequence words", () => {
+  it("parses story options, next+N, recommit, bond-N and companion amounts", () => {
+    expect(parseEffect("二选一(next+1 | 「你看清了地形 & 退路」 & momentum+1)")).toEqual({
+      k: "choose",
+      n: 1,
+      options: [
+        { k: "next", n: 1 },
+        { k: "all", items: [{ k: "note", text: "你看清了地形 & 退路" }, { k: "meter", meter: "momentum", delta: 1 }] },
+      ],
+    });
+    expect(parseEffect("recommit & bond-1 & companion-?")).toEqual({ k: "all", items: [{ k: "recommit" }, { k: "bond", n: -1 }, { k: "companion", delta: "-ask" }] });
+    expect(() => parseEffect("「没有收尾")).toThrow(/unclosed/);
+  });
+
+  it("next+N is added to the next action roll only", () => {
+    const c = campaign();
+    c.act({ t: "effect", atoms: [{ k: "next", n: 1 }] });
+    c.act({ t: "roll", move: "probe", stat: "edge", dice: { d6: 3, c1: 9, c2: 9 } });
+    expect(c.state.pending?.adds).toBe(1);
+    const first = c.state.pending?.score as number;
+    c.act({ t: "endRoll" });
+    c.act({ t: "roll", move: "probe", stat: "edge", dice: { d6: 3, c1: 9, c2: 9 } });
+    expect(c.state.pending?.adds).toBe(0);
+    expect(c.state.pending?.score).toBe(first - 1);
+  });
+
+  it("recommit keeps one box and raises the rank, stopping at epic", () => {
+    const c = campaign();
+    c.act({ t: "newTrack", kind: "vow", name: "v", rank: "extreme" });
+    c.act({ t: "mark", track: "t1", ticks: 22 });
+    c.act({ t: "effect", atoms: [{ k: "recommit" }], track: "t1" });
+    expect(c.state.tracks[0]).toMatchObject({ ticks: 4, rank: "epic" });
+    c.act({ t: "effect", atoms: [{ k: "recommit" }], track: "t1" });
+    expect(c.state.tracks[0]).toMatchObject({ ticks: 4, rank: "epic" });
+  });
+
+  it("bond-N clears ticks and companion± changes the companion's health within its max", () => {
+    const c = campaign();
+    c.act({ t: "bonds", ticks: 2 });
+    c.act({ t: "effect", atoms: [{ k: "bond", n: -1 }] });
+    expect(c.state.character.bonds).toBe(1);
+    expect(() => c.act({ t: "effect", atoms: [{ k: "companion", delta: -1 }] })).toThrow(RuleError);
+    c.act({ t: "addAsset", asset: "lantern-moth", free: true });
+    c.act({ t: "effect", atoms: [{ k: "companion", delta: "-ask" }], amounts: [2] });
+    expect(c.state.character.assets[0]?.health).toBe(1);
+    c.act({ t: "effect", atoms: [{ k: "companion", delta: 9 }], asset: "lantern-moth" });
+    expect(c.state.character.assets[0]?.health).toBe(3);
+  });
+});

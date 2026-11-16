@@ -26,8 +26,8 @@ export function MoveSheet(props: {
   const [track, setTrack] = useState<string | undefined>();
   const pending = state.pending && state.pending.move === move.id ? state.pending : null;
 
-  const apply = (atoms: Atom[], amounts: number[], tr?: string) => props.act({ t: "effect", atoms, amounts, track: tr });
-  const applyFrom = (source: string) => (atoms: Atom[], amounts: number[], tr?: string) => props.act({ t: "effect", atoms, amounts, track: tr, source });
+  const apply = (atoms: Atom[], amounts: number[], tr?: string, asset?: string) => props.act({ t: "effect", atoms, amounts, track: tr, asset });
+  const applyFrom = (source: string) => (atoms: Atom[], amounts: number[], tr?: string, asset?: string) => props.act({ t: "effect", atoms, amounts, track: tr, asset, source });
   // Combat moves mark the foe's (combat) track; progress moves their own kind.
   const kind = move.track && move.track !== "bonds" ? move.track : move.category === "combat" ? "combat" : undefined;
   const consequence = (src: string, testid: string, done?: boolean, source?: string) => (
@@ -96,6 +96,11 @@ export function MoveSheet(props: {
               </div>
             )}
             <Stepper label={t("move.adds")} value={adds} min={0} max={5} onChange={setAdds} />
+            {(state.bonus ?? 0) > 0 && (
+              <div className="iw-good iw-small" data-testid="bonus">
+                {t("move.bonus", { n: state.bonus ?? 0 })}
+              </div>
+            )}
             {related.length > 0 && (
               <div className="iw-related">
                 <div className="iw-muted iw-small">{t("move.related")}</div>

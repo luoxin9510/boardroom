@@ -183,3 +183,32 @@ test("Ironsworn works offline once loaded", async ({ page, context }) => {
   await page.getByTestId("ask-likely").tap();
   await expect(page.getByTestId("oracle-result")).toBeVisible();
 });
+
+test("story options, a bonus on the next roll, and recommitting to a vow", async ({ page }) => {
+  await start(page);
+  await rollWith(page, "befriend", { d6: 6, c1: 1, c2: 10 });
+  await expect(page.getByTestId("outcome")).toHaveText("弱成功");
+  await page.getByTestId("res-weak-opt-0").tap();
+  await page.getByTestId("res-weak-apply").tap();
+  await page.getByTestId("done").tap();
+  await page.getByTestId("move-probe").tap();
+  await expect(page.getByTestId("bonus")).toContainText("+1");
+  await page.locator(".br-sheet-backdrop").click({ position: { x: 10, y: 10 } });
+  await page.getByTestId("nav-tracks").tap();
+  await page.getByTestId("new-track").tap();
+  await page.getByTestId("track-name").fill("护送");
+  await page.getByTestId("rank-extreme").tap();
+  await page.getByTestId("create-track").tap();
+  for (let i = 0; i < 5; i++) await page.getByTestId("mark-t1").tap();
+  await page.getByTestId("roll-t1").tap();
+  await page.getByTestId("manual-dice").check();
+  await page.getByTestId("dice-c1").fill("9");
+  await page.getByTestId("dice-c2").fill("10");
+  await page.getByTestId("roll").tap();
+  await expect(page.getByTestId("outcome")).toHaveText("失败");
+  await page.getByTestId("res-miss-opt-0").tap();
+  await page.getByTestId("res-miss-apply").tap();
+  await page.getByTestId("done").tap();
+  await expect(page.getByTestId("track-t1")).toContainText("史诗");
+  await expect(page.getByTestId("track-t1")).toContainText("1/10");
+});
