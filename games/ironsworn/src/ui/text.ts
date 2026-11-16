@@ -31,7 +31,15 @@ export function atomText(a: Atom, t: T, pack: ContentPack, lang: Lang): string {
     case "boxes":
       return t("atom.boxes", { n: a.n });
     case "bond":
-      return t("atom.bond", { n: a.n });
+      return t("atom.bond", { n: signed(a.n) });
+    case "next":
+      return t("atom.next", { n: a.n });
+    case "recommit":
+      return t("atom.recommit");
+    case "companion":
+      return t("atom.companion", { d: typeof a.delta === "number" ? signed(a.delta) : a.delta === "-ask" ? "−?" : "+?" });
+    case "note":
+      return a.text;
     case "harm":
       return t("atom.harm", { n: a.n });
     case "move":

@@ -5,7 +5,8 @@ import type { State } from "../engine";
 import type { ContentPack, TrackKind } from "../types";
 import { atomText, pick } from "./text";
 
-const needsTrackAtom = (a: Atom) => a.k === "progress" || a.k === "boxes" || (a.k === "xp" && typeof a.delta === "string");
+const needsTrackAtom = (a: Atom) => a.k === "progress" || a.k === "boxes" || a.k === "recommit" || (a.k === "xp" && typeof a.delta === "string");
+const asks = (a: Atom) => (a.k === "meter" || a.k === "companion") && typeof a.delta === "string";
 
 /**
  * Turns a consequence expression into buttons: choices become chips (pick N), "?" amounts get a stepper, progress
@@ -16,7 +17,7 @@ export function Consequence(props: {
   src: string;
   state: State;
   pack: ContentPack;
-  apply: (atoms: Atom[], amounts: number[], track?: string) => boolean;
+  apply: (atoms: Atom[], amounts: number[], track?: string, asset?: string) => boolean;
   openMove: (id: string) => void;
   rollOracle: (id: string) => void;
   /** The track kind this move's progress belongs to (combat moves mark combat tracks). */
@@ -30,6 +31,7 @@ export function Consequence(props: {
   const [picks, setPicks] = useState<Record<string, number[]>>({});
   const [amounts, setAmounts] = useState<Record<string, number>>({});
   const [track, setTrack] = useState<string | undefined>(undefined);
+  const [companion, setCompanion] = useState<string | undefined>(undefined);
   const [appliedHere, setApplied] = useState(false);
   const applied = appliedHere || !!props.done;
   if (!effect) return null;
@@ -39,13 +41,16 @@ export function Consequence(props: {
   const pointers = all.filter((a) => a.k === "move" || a.k === "oracle");
   const chosen = resolveChoice(effect, picks);
   const actionable = chosen?.filter((a) => a.k !== "move" && a.k !== "oracle") ?? null;
-  const askAtoms = (actionable ?? []).filter((a) => a.k === "meter" && typeof a.delta === "string");
+  const askAtoms = (actionable ?? []).filter(asks);
+  const companions = props.state.character.assets.filter((x) => x.health !== undefined);
+  const usesCompanion = (actionable ?? []).some((a) => a.k === "companion");
+  const chosenCompanion = companion ?? (companions.length === 1 ? companions[0]?.id : undefined);
   const usesTrack = (actionable ?? []).some(needsTrackAtom);
   const candidates = props.state.tracks.filter((x) => x.status === "active" && (!props.kind || x.kind === props.kind));
   const fixed = props.state.pending?.track;
   const chosenTrack = fixed ?? track ?? (candidates.length === 1 ? candidates[0]?.id : undefined);
   const trackName = props.state.tracks.find((x) => x.id === chosenTrack)?.name;
-  const ready = actionable !== null && actionable.length > 0 && (!usesTrack || chosenTrack);
+  const ready = actionable !== null && actionable.length > 0 && (!usesTrack || chosenTrack) && (!usesCompanion || chosenCompanion);
 
   const render = (e: Effect, path: string): JSX.Element => {
     if (e.k === "all") return <>{e.items.map((x, i) => <span key={i}>{i > 0 && " + "}{render(x, `${path}.${i}`)}</span>)}</>;
@@ -108,6 +113,16 @@ export function Consequence(props: {
           )}
         </div>
       )}
+      {usesCompanion && !applied && companions.length !== 1 && (
+        <select className="iw-select" value={chosenCompanion ?? ""} onChange={(e) => setCompanion(e.target.value)} data-testid={`${id}-companion`}>
+          <option value="">{companions.length ? t("eff.companion") : t("err.noCompanion")}</option>
+          {companions.map((x) => (
+            <option key={x.id} value={x.id}>
+              {pick(x.name, lang)} · {x.health}
+            </option>
+          ))}
+        </select>
+      )}
       {(actionable?.length ?? 0) > 0 || !chosen ? (
         <button
           className={`br-btn ${applied ? "" : "is-primary"} is-block`}
@@ -115,7 +130,7 @@ export function Consequence(props: {
           onClick={() => {
             if (!actionable) return;
             const amts = askAtoms.map((a) => amounts[atomText(a, t, props.pack, lang)] ?? 1);
-            if (props.apply(actionable, amts, chosenTrack)) setApplied(true);
+            if (props.apply(actionable, amts, chosenTrack, chosenCompanion)) setApplied(true);
           }}
           data-testid={`${id}-apply`}
         >

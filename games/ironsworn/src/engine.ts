@@ -105,6 +105,8 @@ export interface State {
   tracks: Track[];
   nextTrack: number;
   pending: Roll | null;
+  /** Added to the next action roll ("make a move now, add +1"); used up by it. */
+  bonus?: number;
 }
 
 export type Dice = { d6?: number; c1?: number; c2?: number };
@@ -116,7 +118,7 @@ export type Action =
   | { t: "progressRoll"; move: string; track?: string; dice?: Dice }
   | { t: "burn" }
   /** Applies chosen consequences; `amounts` answers the "?" atoms in order; `track` is the progress track they mark. */
-  | { t: "effect"; atoms: Atom[]; amounts?: number[]; track?: string; /** "asset:<id>:<ability>" for an asset ability; omitted for the move's own result. */ source?: string }
+  | { t: "effect"; atoms: Atom[]; amounts?: number[]; track?: string; /** The companion asset a companion± atom changes. */ asset?: string; /** "asset:<id>:<ability>" for an asset ability; omitted for the move's own result. */ source?: string }
   | { t: "endRoll" }
   /** Manual adjustment: always allowed, no rules applied (PRD decision 1). */
   | { t: "meter"; meter: Meter | "momentum"; delta: number }
@@ -291,8 +293,10 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
             stat = m.stats[vals.indexOf(v)];
           }
           need(stat && m.stats.includes(stat), "err.statNotAllowed");
-          const adds = action.adds ?? 0;
-          need(Number.isInteger(adds) && adds >= 0 && adds <= 10, "err.adds");
+          need(Number.isInteger(action.adds ?? 0) && (action.adds ?? 0) >= 0 && (action.adds ?? 0) <= 10, "err.adds");
+          const adds = (action.adds ?? 0) + (s.bonus ?? 0);
+          // Deleted rather than zeroed, so replaying an older save (no "bonus" field) gives the same state.
+          delete s.bonus;
           const d6 = die(s, 6, action.dice?.d6);
           const c1 = die(s, 10, action.dice?.c1);
           const c2 = die(s, 10, action.dice?.c2);
@@ -393,6 +397,29 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
                 need(s.pending, "err.noRoll");
                 s.pending.harm += a.n;
                 break;
+              case "next":
+                s.bonus = (s.bonus ?? 0) + a.n;
+                break;
+              case "recommit": {
+                const t = progressTrack();
+                need(t.status === "active", "err.trackClosed");
+                const from = t.ticks;
+                t.ticks = Math.min(Math.floor(t.ticks / 4), 1) * 4;
+                t.rank = RANKS[Math.min(RANKS.indexOf(t.rank) + 1, RANKS.length - 1)] as Rank;
+                log({ k: "track", track: { ...t }, change: "mark", from });
+                break;
+              }
+              case "companion": {
+                const owned = c.assets.filter((x) => x.health !== undefined);
+                const target = action.asset ? owned.find((x) => x.id === action.asset) : owned.length === 1 ? owned[0] : undefined;
+                need(target, "err.noCompanion");
+                const n = a.delta === "ask" ? nextAmount() : a.delta === "-ask" ? -nextAmount() : a.delta;
+                if (typeof a.delta === "string") resolved.push(Math.abs(n));
+                const max = pack.assets.find((x) => x.id === target.id)?.health ?? 5;
+                target.health = clamp((target.health as number) + n, 0, max);
+                break;
+              }
+              case "note":
               case "move":
               case "oracle":
                 // Pointers for the UI ("next: Pay the Price"); nothing changes in the state.

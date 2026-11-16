@@ -8,6 +8,11 @@ import { DEBILITIES, type Debility } from "./types";
  *   initiative+  initiative-  mark:wounded  clear:shaken
  *   progress+1  progress×harm  progress+2格  bond+1  harm+1
  *   move:pay-the-price  oracle:face-death
+ *   next+1                       add +1 to your next action roll ("make a move now, add +1")
+ *   recommit                     clear all but one filled box of the track and raise its rank one step
+ *   bond-1                       clear a bond (bonds track −1 tick)
+ *   companion-?  companion+1     a companion asset's health
+ *   「text」                     an option that only happens in the story (logged, changes nothing)
  *   A & B   二选一(A | B)   选2(A | B | C)   可多选(A | B)
  *
  * English spellings work too: one(…), pick2(…), any(…), progress*harm, progress+2box.
@@ -21,6 +26,10 @@ export type Atom =
   | { k: "boxes"; n: number }
   | { k: "bond"; n: number }
   | { k: "harm"; n: number }
+  | { k: "next"; n: number }
+  | { k: "recommit" }
+  | { k: "companion"; delta: number | "ask" | "-ask" }
+  | { k: "note"; text: string }
   | { k: "move"; id: string }
   | { k: "oracle"; id: string };
 
@@ -35,15 +44,20 @@ export function parseEffect(src: string): Effect | null {
   return parseSeq(s);
 }
 
-const CLOSE: Record<string, string> = { "(": ")", "（": "）" };
+const CLOSE: Record<string, string> = { "(": ")", "（": "）", "「": "」" };
 
 function splitTop(s: string, sep: string): string[] {
   const out: string[] = [];
   const open: string[] = [];
   let cur = "";
   for (const ch of s) {
-    if (ch in CLOSE) open.push(ch);
-    if (ch === ")" || ch === "）") {
+    if (ch in CLOSE && open.at(-1) !== "「") open.push(ch);
+    // Inside 「story text」 nothing is syntax.
+    if (open.at(-1) === "「" && ch !== "」") {
+      cur += ch;
+      continue;
+    }
+    if (ch === ")" || ch === "）" || ch === "」") {
       const o = open.pop();
       if (o === undefined) throw new EffectError(`unbalanced "${ch}" in "${s}"`);
       if (CLOSE[o] !== ch) throw new EffectError(`"${o}" is closed with "${ch}" in "${s}"`);
@@ -96,7 +110,14 @@ function parseAtom(s: string): Atom {
   if ((m = /^progress\+(\d+)$/.exec(s))) return { k: "progress", times: Number(m[1]) };
   if (/^progress[×x*]harm$/.test(s)) return { k: "progress", times: "harm" };
   if ((m = /^progress\+(\d+)(格|box)$/.exec(s))) return { k: "boxes", n: Number(m[1]) };
-  if ((m = /^bond\+(\d+)$/.exec(s))) return { k: "bond", n: Number(m[1]) };
+  if ((m = /^bond([+-])(\d+)$/.exec(s))) return { k: "bond", n: (m[1] === "-" ? -1 : 1) * Number(m[2]) };
+  if ((m = /^next\+(\d+)$/.exec(s))) return { k: "next", n: Number(m[1]) };
+  if (s === "recommit") return { k: "recommit" };
+  if ((m = /^companion([+-])(\d+|\?)$/.exec(s))) return { k: "companion", delta: m[2] === "?" ? (m[1] === "-" ? "-ask" : "ask") : (m[1] === "-" ? -1 : 1) * Number(m[2]) };
+  if ((m = /^「([^」]*)」$/.exec(s))) {
+    if (!(m[1] as string).trim()) throw new EffectError(`empty story option 「」 in "${s}"`);
+    return { k: "note", text: (m[1] as string).trim() };
+  }
   if ((m = /^harm\+(\d+)$/.exec(s))) return { k: "harm", n: Number(m[1]) };
   if ((m = /^(move|oracle):([a-z0-9-]+)$/.exec(s))) return { k: m[1] as "move", id: m[2] as string };
   throw new EffectError(`"${s}" is not a known consequence (e.g. momentum+1, health-?, progress×harm, move:id, 二选一(A | B))`);
