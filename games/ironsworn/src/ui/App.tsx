@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Campaign, ContentError, langFromLocale, newSeed, RuleError, type CampaignSave, type Host, type Lang } from "@boardroom/core";
 import { LangProvider, RulesView, Sheet, Toasts, useLang, useToasts, useWakeLock } from "@boardroom/ui";
 import { FOLDERS, parseContent } from "../content";
-import { makeEngine, newCampaign, type Action, type Entry, type State } from "../engine";
+import { makeEngine, newCampaign, PORTRAITS, type Action, type Entry, type State } from "../engine";
 import { messages } from "../messages";
 import type { ContentPack } from "../types";
 import { MoveSheet } from "./MoveSheet";
-import { CharacterTab, JournalTab, MetersBar, MovesTab, OraclesTab, TracksTab } from "./Tabs";
+import { CharacterTab, JournalTab, MetersBar, MovesTab, OraclesTab, TracksTab, type Portraits } from "./Tabs";
 import { Wizard } from "./Wizard";
 import { entryText, journalMarkdown, type Note } from "./text";
 import "./iw.css";
@@ -74,6 +74,16 @@ function Game({ host }: { host: Host }) {
   const tRef = useRef(t);
   tRef.current = t;
   useWakeLock(true);
+  const portraits = useMemo<Portraits>(
+    () => ({
+      list: host.listImages(PORTRAITS).flatMap((path) => {
+        const url = host.imageUrl(path);
+        return url ? [{ path, url }] : [];
+      }),
+      url: (path) => (path ? host.imageUrl(path) : null),
+    }),
+    [host],
+  );
   // A new campaign opens the character wizard; the first visit ever shows a short how-to-play.
   const [fresh, setFresh] = useState(false);
   const [intro, setIntro] = useState(() => !host.getSetting<boolean>("iw.intro"));
@@ -233,6 +243,7 @@ function Game({ host }: { host: Host }) {
     <>
       <CampaignView
         campaign={c}
+        portraits={portraits}
         pack={pack}
         notes={notes}
         act={act}
@@ -330,6 +341,7 @@ function CampaignView(props: {
   exportIt: () => void;
   toggleLang: () => void;
   startWizard?: boolean;
+  portraits?: Portraits;
 }) {
   const { t } = useLang();
   const [wizard, setWizard] = useState(!!props.startWizard);
@@ -351,6 +363,7 @@ function CampaignView(props: {
         <button className="br-btn is-quiet iw-icon" onClick={props.back} aria-label={t("menu.back")} data-testid="back">
           ✕
         </button>
+        {props.portraits?.url(state.character.portrait) && <img className="iw-portrait is-small" src={props.portraits.url(state.character.portrait) as string} alt="" data-testid="top-portrait" />}
         <div className="iw-title">{state.character.name || c.title}</div>
         <button className="br-btn is-quiet iw-icon" onClick={props.undo} disabled={!c.canUndo} aria-label={t("menu.undo")} data-testid="undo">
           ↶
@@ -361,7 +374,7 @@ function CampaignView(props: {
       </header>
       <MetersBar state={state} act={props.act} openRules={props.openRules} />
       <main className={`iw-main${state.pending && !moveDef ? " has-pending" : ""}`}>
-        {tab === "character" && <CharacterTab state={state} pack={props.pack} act={props.act} openRules={props.openRules} />}
+        {tab === "character" && <CharacterTab state={state} pack={props.pack} act={props.act} openRules={props.openRules} portraits={props.portraits} />}
         {tab === "moves" && <MovesTab pack={props.pack} open={openMove} />}
         {tab === "tracks" && <TracksTab state={state} pack={props.pack} act={props.act} openMove={openMove} />}
         {tab === "oracles" && <OraclesTab pack={props.pack} act={props.act} last={c.journal.at(-1)} />}

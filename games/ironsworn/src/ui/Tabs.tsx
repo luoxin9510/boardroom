@@ -20,11 +20,19 @@ export function Boxes(props: { ticks: number }) {
 
 // ---------- 角色 ----------
 
-export function CharacterTab(props: { state: State; pack: ContentPack; act: Act; openRules?: (topic: string) => void }) {
+/** The images a campaign can use as its character portrait, with their URLs. */
+export interface Portraits {
+  list: { path: string; url: string }[];
+  url: (path: string | undefined) => string | null;
+}
+
+export function CharacterTab(props: { state: State; pack: ContentPack; act: Act; openRules?: (topic: string) => void; portraits?: Portraits }) {
   const { t, lang } = useLang();
   const c = props.state.character;
   const [statEdit, setStatEdit] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const portraitUrl = props.portraits?.url(c.portrait) ?? null;
   const groups = [
     ["conditions", ["wounded", "shaken", "unprepared", "encumbered"]],
     ["banes", ["maimed", "corrupted"]],
@@ -32,6 +40,12 @@ export function CharacterTab(props: { state: State; pack: ContentPack; act: Act;
   ] as const;
   return (
     <div className="iw-tab" data-testid="tab-character">
+      <div className="iw-row iw-charhead">
+        <button className="iw-portrait is-large" onClick={() => setChoosing(true)} aria-label={t("char.portrait")} data-testid="portrait">
+          {portraitUrl ? <img src={portraitUrl} alt="" /> : <span>＋</span>}
+        </button>
+        <span className="iw-muted iw-small">{t("char.portrait")}</span>
+      </div>
       <label className="iw-row iw-namerow">
         <span className="iw-label">{t("char.name")}</span>
         <NameInput key={c.name} value={c.name} onCommit={(v) => props.act({ t: "name", name: v })} />
@@ -144,6 +158,41 @@ export function CharacterTab(props: { state: State; pack: ContentPack; act: Act;
       {statEdit && (
         <Sheet title={t(`stat.${statEdit}`)} onClose={() => setStatEdit(null)}>
           <Stepper label={t(`stat.${statEdit}`)} value={c.stats[statEdit as "edge"]} min={0} max={4} onChange={(v) => props.act({ t: "stat", stat: statEdit as "edge", value: v })} />
+        </Sheet>
+      )}
+      {choosing && (
+        <Sheet title={t("char.portrait")} onClose={() => setChoosing(false)} tall>
+          {props.portraits?.list.length ? (
+            <div className="iw-portraits">
+              {props.portraits.list.map((p) => (
+                <button
+                  key={p.path}
+                  className={`iw-portrait${c.portrait === p.path ? " is-on" : ""}`}
+                  onClick={() => {
+                    if (props.act({ t: "portrait", path: p.path })) setChoosing(false);
+                  }}
+                  data-testid={`portrait-${p.path.split("/").pop()}`}
+                >
+                  <img src={p.url} alt="" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="iw-muted" data-testid="portrait-empty">
+              {t("char.portraitEmpty")}
+            </p>
+          )}
+          {c.portrait && (
+            <button
+              className="br-btn is-quiet is-block"
+              onClick={() => {
+                if (props.act({ t: "portrait", path: null })) setChoosing(false);
+              }}
+              data-testid="portrait-none"
+            >
+              {t("char.portraitNone")}
+            </button>
+          )}
         </Sheet>
       )}
       {adding && <AssetPicker pack={props.pack} state={props.state} act={props.act} onClose={() => setAdding(false)} />}
