@@ -386,3 +386,18 @@ describe("tutorial cards", () => {
     expect([...TUTORIAL_NOTES].sort((a, b) => a.path.localeCompare(b.path))).toEqual(fresh);
   });
 });
+
+describe("tutorial game choice", () => {
+  it("uses the loaded pack (so its art shows) with a seed where yellow can reach the first location", async () => {
+    const { tutorialGame } = await import("../src/tutorial");
+    const pack = parseContent(fixtureNotes());
+    const g = tutorialGame(pack);
+    expect(g.pack).toBe(pack);
+    expect(targets(setup(pack, g.seed, { difficulty: "normal" }), "yellow")[0]).toBe(0);
+    expect(tutorialGame(pack).seed).toBe(g.seed);
+  });
+  it("falls back to the built-in cards without a pack", async () => {
+    const { tutorialGame, TUTORIAL_SEED } = await import("../src/tutorial");
+    expect(tutorialGame(null).seed).toBe(TUTORIAL_SEED);
+  });
+});

@@ -9,7 +9,7 @@ import type { ContentPack } from "../types";
 import { Board, ManualSheet } from "./Board";
 import { feed } from "./text";
 import { Coach } from "./Coach";
-import { TUTORIAL_SEED, tutorialPack } from "../tutorial";
+import { tutorialGame } from "../tutorial";
 import "./gm.css";
 
 type GmSession = Session<State, Action, Event, Options>;
@@ -144,8 +144,8 @@ function Game({ host }: { host: Host }) {
 
   /** A guided game on the built-in tutorial cards. Leaves any saved game alone. */
   const startTutorial = () => {
-    const tp = tutorialPack();
-    session.current = new Session(makeEngine(tp), GAME, tp.hash, TUTORIAL_SEED, { difficulty: "normal" });
+    const tg = tutorialGame(pack);
+    session.current = new Session(makeEngine(tg.pack), GAME, tg.pack.hash, tg.seed, { difficulty: "normal" });
     tutorial.current = true;
     setTutStep(0);
     setMenu("none");
