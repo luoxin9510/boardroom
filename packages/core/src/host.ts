@@ -7,6 +7,8 @@ export interface Host {
   readNotes(folder: string): Promise<{ path: string; text: string }[]>;
   /** A URL the page can show for an image in the vault, or null if the file is missing. */
   imageUrl(path: string): string | null;
+  /** Paths of the images in the content pack under `folder` (recursively), sorted. */
+  listImages(folder: string): string[];
   /** A file's text, or null if it does not exist. */
   readFile(path: string): Promise<string | null>;
   /** Creates or replaces a file, creating folders as needed. */

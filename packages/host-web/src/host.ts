@@ -37,6 +37,7 @@ export function makeHost(pack: Pack, space: string, exit: () => void): { host: H
       return notes.filter((n) => n.path.startsWith(`${folder}/`));
     },
     imageUrl: (path) => urls.get(path) ?? null,
+    listImages: (folder) => [...urls.keys()].filter((p) => p.startsWith(`${folder}/`)).sort(),
     async readFile(path) {
       return (await store.get<string>("files", key(path))) ?? null;
     },

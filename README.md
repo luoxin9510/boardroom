@@ -16,7 +16,7 @@ Each game is a TypeScript rules engine plus a mobile-first React UI. A game's co
    ```
 3. In the app, **Import content pack** and pick the zip. Re-import after editing the vault; saves are kept.
 
-The vault needs a `boardroom.json` (`{ "game": "goblin-mountain" }`) and the card notes in `卡牌/` (format: [docs/games/goblin-mountain.md](docs/games/goblin-mountain.md) §3). For Ironsworn: `{ "game": "ironsworn", "folders": ["动作", "资产", "先知", "真相", "规则"] }` and notes in those folders ([docs/games/ironsworn.md](docs/games/ironsworn.md) §3).
+The vault needs a `boardroom.json` (`{ "game": "goblin-mountain" }`) and the card notes in `卡牌/` (format: [docs/games/goblin-mountain.md](docs/games/goblin-mountain.md) §3). For Ironsworn: `{ "game": "ironsworn", "folders": ["动作", "资产", "先知", "真相", "规则", "头像"] }` and notes in those folders ([docs/games/ironsworn.md](docs/games/ironsworn.md) §3).
 
 ## Layout
 

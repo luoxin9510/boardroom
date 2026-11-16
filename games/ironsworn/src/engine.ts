@@ -44,6 +44,8 @@ export interface Character {
   bonds: number;
   initiative: boolean;
   assets: OwnedAsset[];
+  /** An image in the content pack (头像/…); absent when none is chosen. */
+  portrait?: string;
 }
 
 export interface Track {
@@ -116,6 +118,8 @@ export type Dice = { d6?: number; c1?: number; c2?: number };
 
 export type Action =
   | { t: "name"; name: string }
+  /** The character's portrait: an image path in the content pack (头像/…), or null for none. */
+  | { t: "portrait"; path: string | null }
   | { t: "stat"; stat: Stat; value: number }
   | { t: "roll"; move: string; stat?: RollStat; adds?: number; dice?: Dice }
   | { t: "progressRoll"; move: string; track?: string; dice?: Dice }
@@ -188,6 +192,9 @@ export function newCharacter(name = ""): Character {
     assets: [],
   };
 }
+
+/** The content-pack folder of character portraits. */
+export const PORTRAITS = "头像";
 
 /** A fresh campaign state. */
 export function newCampaign(seed: number, name = ""): State {
@@ -282,6 +289,11 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
       switch (action.t) {
         case "name":
           c.name = action.name.trim();
+          break;
+        case "portrait":
+          need(action.path === null || (typeof action.path === "string" && action.path.startsWith(`${PORTRAITS}/`)), "err.portrait");
+          if (action.path) c.portrait = action.path;
+          else delete c.portrait;
           break;
         case "stat":
           need(STATS.includes(action.stat) && Number.isInteger(action.value) && action.value >= 0 && action.value <= 4, "err.statRange");

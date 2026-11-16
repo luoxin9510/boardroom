@@ -417,3 +417,14 @@ describe("world truths", () => {
     expect(() => c.act({ t: "truth", truth: "old-age", row: 5 })).toThrow(RuleError);
   });
 });
+
+describe("portrait", () => {
+  it("is a path in the portraits folder, and can be cleared", () => {
+    const c = campaign();
+    c.act({ t: "portrait", path: "头像/灰狼.png" });
+    expect(c.state.character.portrait).toBe("头像/灰狼.png");
+    expect(() => c.act({ t: "portrait", path: "规则/图/x.png" })).toThrow(RuleError);
+    c.act({ t: "portrait", path: null });
+    expect("portrait" in c.state.character).toBe(false);
+  });
+});

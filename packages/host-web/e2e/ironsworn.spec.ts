@@ -288,3 +288,15 @@ test("a move links to its rules section", async ({ page }) => {
   await page.getByTestId("move-rules").tap();
   await expect(page.getByTestId("rules")).toBeVisible();
 });
+
+test("choose a character portrait", async ({ page }) => {
+  await start(page);
+  await page.getByTestId("nav-character").tap();
+  await page.getByTestId("portrait").tap();
+  await page.getByTestId("portrait-猎手.png").tap();
+  await expect(page.getByTestId("portrait").locator("img")).toBeVisible();
+  await expect(page.getByTestId("top-portrait")).toBeVisible();
+  await page.getByTestId("portrait").tap();
+  await page.getByTestId("portrait-none").tap();
+  await expect(page.getByTestId("top-portrait")).toHaveCount(0);
+});
