@@ -26,7 +26,7 @@
 - **托管**：GitHub Pages（`https://luoxin9510.github.io/boardroom/`），推到 main 自动部署（`.github/workflows/pages.yml`）。页面里只有代码和原创测试卡，公开没有问题。
 - **安装**：iPhone Safari 打开 → 分享 → 添加到主屏幕。主屏幕上的 PWA 全屏运行，数据不会因为长时间不用被系统清掉。**先安装再导入**：主屏幕 App 和 Safari 的数据是分开的，在 Safari 里导入的内容到主屏幕 App 里看不到（书架页在 Safari 里会提示）。
 - **离线**：构建时生成 `sw.js`，第一次打开就把所有文件缓存下来（绕过 HTTP 缓存取，避免新版本存进旧的 index.html），之后完全离线可用；版本号按所有文件内容算，新版本部署后在后台下载（App 从后台切回来时也会检查），下载好就在顶部弹出「新版本已下载，点这里更新」，点一下重新加载；对局每步都存了，不会丢。
-- **内容进手机**：在 Mac 上 `npm run pack -- <vault>` 把 `boardroom.json`、`卡牌/`、`规则/` 里的笔记和图片打成 zip（不含 PDF、隐藏文件和 `对局/`），AirDrop 到手机，在 App 的书架页「导入内容包」。导入时先用游戏自己的解析器检查，有错就显示原因、不覆盖旧内容；写入是一个事务，替换旧包要么全成要么不变。Finder 直接压缩 vault 文件夹得到的 zip 也认（自动找 `boardroom.json` 所在的文件夹，忽略 `__MACOSX`，修正没标 UTF-8 的中文文件名）。
+- **内容进手机**：在 Mac 上 `npm run pack -- <vault>` 把 `boardroom.json` 和它 `folders` 里列出的文件夹（默认 `卡牌/`、`规则/`）里的笔记和图片打成 zip（不含 PDF、隐藏文件、`对局/` 和 `战役/`），AirDrop 到手机，在 App 的书架页「导入内容包」。导入时先用游戏自己的解析器检查，有错就显示原因、不覆盖旧内容；写入是一个事务，替换旧包要么全成要么不变。Finder 直接压缩 vault 文件夹得到的 zip 也认（自动找 `boardroom.json` 所在的文件夹，忽略 `__MACOSX`，修正没标 UTF-8 的中文文件名）。
 - **本机存储**（IndexedDB，一个库 `boardroom`）：`content` 存导入的内容包（按文件存字节，不存 Blob：WebKit 无痕模式存不了 Blob，也少几份内存拷贝），`files` 存存档，`packs` 存每个内容包的导入信息。语言设置放 localStorage（丢了只是语言回到默认）。iOS 后台久了数据库连接会断，读写时发现就自动重连一次。
 - **书架页**：已导入的游戏（开始 / 删除内容，删除要点两次，存档保留）、导入内容包、用测试卡试玩、导出全部存档（JSON，备份用；暂时没有恢复入口）、「添加到主屏幕」提示、离线就绪标记。
 - **测试卡**：`fixtures/` 的原创卡打包进 App，谁都能试玩，e2e 也用它；存档和真内容分开放（`<游戏>@demo`）。
@@ -70,7 +70,7 @@ scripts/
 - 游戏数据都是 vault 里的 markdown 笔记（frontmatter + 表格）和图片，人读人改；`npm run pack` 打成 zip 导入 App（§3）。
 - 文件夹、笔记名、表格列名用中文；frontmatter 键和 ID 用英文；列名到字段的映射写在代码里，写错就报人话错误（指出文件、行、列）。
 - 改了内容要重新打包、重新导入；导入只替换内容，存档保留。
-- vault 根目录的 `boardroom.json` 声明这是哪款游戏：`{ "game": "goblin-mountain" }`。
+- vault 根目录的 `boardroom.json` 声明这是哪款游戏和要打包的文件夹：`{ "game": "goblin-mountain" }`（默认打 `卡牌`、`规则`），或 `{ "game": "ironsworn", "folders": ["动作", "资产", "先知", "真相", "规则"] }`。
 
 ### 4.4 双语
 
@@ -101,7 +101,7 @@ scripts/
 
 双人同屏、联机（需要 Mac 或 VPS 当服务器）、对局统计、下一款游戏、恢复 Zombicide。
 
-游戏进度：[哥布林山脉](games/goblin-mountain.md) 收尾（2026-11-16，M0–M2 完成，M3 暂缓）；[Zombicide 黑死病](games/zombicide-black-plague.md) 暂停。[铁誓 Ironsworn](games/ironsworn.md) 规格定稿，开始 M0。
+游戏进度：[哥布林山脉](games/goblin-mountain.md) 收尾（2026-11-16，M0–M2 完成，M3 暂缓）；[Zombicide 黑死病](games/zombicide-black-plague.md) 暂停。[铁誓 Ironsworn](games/ironsworn.md) M0 引擎。
 
 ## 7. 决定记录
 

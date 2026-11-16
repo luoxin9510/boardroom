@@ -1,7 +1,8 @@
 // Makes a content pack from a game vault, for importing into the app on a phone.
 //   npm run pack -- <vault path> [output.zip]
-// Takes boardroom.json and the notes and images under 卡牌/ and 规则/ (no PDFs, nothing hidden,
-// not 对局/). The zip goes to ~/Downloads unless you name one; AirDrop it to the phone and import it.
+// Takes boardroom.json and the notes and images under the folders it lists in "folders" (default 卡牌/ and 规则/;
+// no PDFs, nothing hidden, never 对局/ or 战役/). The zip goes to ~/Downloads unless you name one; AirDrop it to the
+// phone and import it.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, relative, resolve } from "node:path";
@@ -18,8 +19,11 @@ if (!existsSync(configPath)) {
   console.error(`no boardroom.json in ${vault}; add one like {"game": "goblin-mountain"}`);
   process.exit(1);
 }
-const { game } = JSON.parse(readFileSync(configPath, "utf8"));
-const FOLDERS = ["卡牌", "规则"];
+const config = JSON.parse(readFileSync(configPath, "utf8"));
+const { game } = config;
+/** Played games and campaign journals stay out of packs even if listed. */
+const NEVER = new Set(["对局", "战役"]);
+const FOLDERS = (Array.isArray(config.folders) ? config.folders : ["卡牌", "规则"]).filter((f) => !NEVER.has(f));
 const KEEP = /\.(md|jpe?g|png|webp|gif|svg)$/i;
 const IMAGE = /\.(jpe?g|png|webp|gif)$/i;
 
