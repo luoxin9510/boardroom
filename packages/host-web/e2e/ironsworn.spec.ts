@@ -3,8 +3,11 @@ import { expect, test, type Page } from "@playwright/test";
 /** Opens the Ironsworn test content and starts a campaign. Each test has fresh storage. */
 async function start(page: Page, name = "艾拉") {
   await page.getByTestId("demo-ironsworn").tap();
+  await page.getByTestId("intro-ok").tap();
   await page.getByTestId("new-name").fill(name);
   await page.getByTestId("new-campaign").tap();
+  // A new campaign opens the character wizard; these tests set up what they need themselves.
+  await page.getByTestId("wiz-skip").tap();
   await expect(page.getByTestId("meters")).toBeVisible();
 }
 
@@ -211,4 +214,77 @@ test("story options, a bonus on the next roll, and recommitting to a vow", async
   await page.getByTestId("done").tap();
   await expect(page.getByTestId("track-t1")).toContainText("史诗");
   await expect(page.getByTestId("track-t1")).toContainText("1/10");
+});
+
+test("first visit: how to play, then create a character with the wizard", async ({ page }) => {
+  await page.getByTestId("demo-ironsworn").tap();
+  await expect(page.getByTestId("intro")).toBeVisible();
+  await page.getByTestId("intro-ok").tap();
+  await page.getByTestId("new-name").fill("卡拉");
+  await page.getByTestId("new-campaign").tap();
+  // 1 world truths
+  await expect(page.getByTestId("wiz-truths")).toBeVisible();
+  await page.getByTestId("truth-old-age-1").tap();
+  await expect(page.getByTestId("truth-old-age")).toContainText("找到解药的配方");
+  await page.getByTestId("wiz-next").tap();
+  // going back and forth keeps what was chosen
+  await page.getByTestId("wiz-back").tap();
+  await expect(page.getByTestId("truth-old-age-1")).toHaveClass(/is-on/);
+  await page.getByTestId("wiz-next").tap();
+  // 2 stats 3/2/2/1/1
+  for (const [s, v] of [["iron", 3], ["edge", 2], ["heart", 2], ["wits", 1], ["shadow", 1]] as const) {
+    await page.getByTestId(`wiz-stat-${s}`).tap();
+    await page.getByTestId(`wiz-value-${v}`).tap();
+  }
+  await expect(page.getByTestId("wiz-stat-iron")).toContainText("3");
+  await expect(page.locator('[data-testid^="wiz-value-"]')).toHaveCount(0);
+  await page.getByTestId("wiz-next").tap();
+  // 3 assets: free
+  await page.getByTestId("wiz-add-asset").tap();
+  await page.getByTestId("pick-lantern-moth").tap();
+  await expect(page.getByTestId("wiz-assets")).toContainText("1/3");
+  // the rules link from a step opens the right section, and closing it comes back to the wizard
+  await page.getByTestId("wiz-rules").tap();
+  await expect(page.getByTestId("rules")).toContainText("建角时免费选三张资源");
+  await page.getByTestId("rules-close").tap();
+  await page.getByTestId("wiz-next").tap();
+  // 4 bonds
+  await page.getByTestId("wiz-bonds").locator("button").filter({ hasText: "+" }).first().tap();
+  await page.getByTestId("wiz-next").tap();
+  // 5 background vow
+  await page.getByTestId("wiz-vow-name").fill("为故乡复仇");
+  await page.getByTestId("wiz-vow-create").tap();
+  await expect(page.getByTestId("wiz-vow-made")).toBeVisible();
+  await page.getByTestId("wiz-back").tap();
+  await page.getByTestId("wiz-next").tap();
+  await expect(page.getByTestId("wiz-vow-made")).toBeVisible();
+  await page.getByTestId("wiz-next").tap();
+  // 6 inciting incident, then go swear it
+  await page.getByTestId("wiz-vow-name").fill("护送信使过沼泽");
+  await page.getByTestId("wiz-vow-create").tap();
+  await page.getByTestId("wiz-swear").tap();
+  await expect(page.getByTestId("move-sheet")).toBeVisible();
+  await page.locator(".br-sheet-backdrop").click({ position: { x: 10, y: 10 } });
+  await page.getByTestId("nav-character").tap();
+  await expect(page.getByTestId("stat-iron")).toContainText("3");
+  await expect(page.getByTestId("asset-lantern-moth")).toBeVisible();
+  await page.getByTestId("char-truths").locator("summary").tap();
+  await expect(page.getByTestId("char-truths")).toContainText("疫病");
+  await page.getByTestId("nav-tracks").tap();
+  await expect(page.getByTestId("tab-tracks")).toContainText("为故乡复仇");
+  await expect(page.getByTestId("tab-tracks")).toContainText("史诗");
+  await page.getByTestId("nav-journal").tap();
+  await expect(page.getByTestId("tab-journal")).toContainText("世界真相「旧时代」");
+  // reopening the app doesn't show the how-to-play again
+  await page.reload();
+  await page.getByTestId("demo-ironsworn").tap();
+  await expect(page.getByTestId("campaigns")).toBeVisible();
+  await expect(page.getByTestId("intro")).toHaveCount(0);
+});
+
+test("a move links to its rules section", async ({ page }) => {
+  await start(page);
+  await page.getByTestId("move-hit").tap();
+  await page.getByTestId("move-rules").tap();
+  await expect(page.getByTestId("rules")).toBeVisible();
 });

@@ -80,6 +80,8 @@ export function entryText(e: Entry, t: T, pack: ContentPack, lang: Lang): string
       return t("j.oracle", { name: pick(e.name, lang), roll: e.roll, text: pick(e.text, lang) });
     case "ask":
       return t("j.ask", { odds: t(`odds.${e.odds}`), roll: e.roll, answer: t(e.yes ? "oracle.yes" : "oracle.no"), match: e.match ? ` · ${t("outcome.match")}` : "" });
+    case "truth":
+      return t("j.truth", { name: pick(e.name, lang), roll: e.roll ? (lang === "zh" ? `（${e.roll}）` : ` (${e.roll})`) : "", text: pick(e.text, lang) });
     case "prompt":
       return t(`prompt.${e.key}`, { amount: e.amount ?? 0 });
   }

@@ -6,6 +6,18 @@ import type { ContentPack, Move, Outcome, RollStat } from "../types";
 import { Consequence } from "./Consequence";
 import { pick, statName } from "./text";
 
+/** The rules page section that explains a move best. */
+export function ruleTopic(move: Move): string {
+  if (move.category === "combat") return "combat";
+  if (move.roll === "progress") return move.track === "journey" ? "journey" : move.track === "bonds" ? "bonds" : "progress";
+  if (move.category === "quest") return "vows";
+  if (/journey|destination/.test(move.id)) return "journey";
+  if (move.category === "relationship") return "bonds";
+  if (move.category === "suffer") return "debilities";
+  if (move.category === "fate") return "oracles";
+  return "action-roll";
+}
+
 /** One move: its trigger, the roll (or progress roll), then the outcome with its consequence buttons. */
 export function MoveSheet(props: {
   move: Move;
@@ -15,6 +27,7 @@ export function MoveSheet(props: {
   onClose: () => void;
   openMove: (id: string) => void;
   rollOracle: (id: string) => void;
+  openRules?: (topic: string) => void;
 }) {
   const { t, lang } = useLang();
   const { move, state } = props;
@@ -65,6 +78,11 @@ export function MoveSheet(props: {
     <Sheet title={pick(move.name, lang)} onClose={props.onClose} tall>
       <div className="iw-move" data-testid="move-sheet">
         <p className="iw-trigger">{pick(move.trigger, lang)}</p>
+        {props.openRules && (
+          <button className="br-btn is-quiet iw-rulelink" onClick={() => props.openRules?.(ruleTopic(move))} data-testid="move-rules">
+            {t("rules.link")}
+          </button>
+        )}
 
         {!pending && move.results.before && (
           <div className="iw-block">

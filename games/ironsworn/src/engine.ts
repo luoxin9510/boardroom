@@ -96,6 +96,7 @@ export type Entry =
   | { k: "xp"; delta: number }
   | { k: "oracle"; table: string; name: Text; roll: number; text: Text }
   | { k: "ask"; odds: Odds; roll: number; yes: boolean; match: boolean }
+  | { k: "truth"; id: string; name: Text; text: Text; seed: Text; roll?: number }
   /** Rules prompts the player should act on: make Face a Setback, trade supply, Face Death… */
   | { k: "prompt"; key: "setback" | "outOfSupply" | "zeroHealth" | "zeroSpirit" | "zeroSupply"; amount?: number };
 
@@ -107,6 +108,8 @@ export interface State {
   pending: Roll | null;
   /** Added to the next action roll ("make a move now, add +1"); used up by it. */
   bonus?: number;
+  /** The world truths chosen at character creation: truth id → row index. Absent until the first is chosen. */
+  truths?: Record<string, number>;
 }
 
 export type Dice = { d6?: number; c1?: number; c2?: number };
@@ -135,6 +138,8 @@ export type Action =
   | { t: "xp"; delta: number }
   | { t: "initiative"; on: boolean }
   | { t: "oracle"; table: string; dice?: number }
+  /** Picks a world truth's row, or rolls d100 for it when `row` is left out. */
+  | { t: "truth"; truth: string; row?: number; dice?: number }
   | { t: "ask"; odds: Odds; dice?: number };
 
 export type Event = Entry;
@@ -558,6 +563,23 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           const row = o.rows.find((r) => n >= r.from && n <= r.to);
           need(row, "err.unknownOracle", { id: action.table });
           log({ k: "oracle", table: o.id, name: o.name, roll: n, text: row.text });
+          break;
+        }
+
+        case "truth": {
+          const tr = pack.truths.find((x) => x.id === action.truth);
+          need(tr, "err.unknownTruth", { id: action.truth });
+          let i = action.row;
+          let roll: number | undefined;
+          if (i === undefined) {
+            roll = die(s, 100, action.dice);
+            i = tr.rows.findIndex((r) => (roll as number) >= r.from && (roll as number) <= r.to);
+            need(i >= 0, "err.truthGap", { roll, id: tr.id });
+          }
+          const row = tr.rows[i];
+          need(Number.isInteger(i) && row, "err.unknownTruth", { id: action.truth });
+          s.truths = { ...(s.truths ?? {}), [tr.id]: i };
+          log({ k: "truth", id: tr.id, name: tr.name, text: row.text, seed: row.seed, roll });
           break;
         }
 

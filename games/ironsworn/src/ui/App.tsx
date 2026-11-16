@@ -7,6 +7,7 @@ import { messages } from "../messages";
 import type { ContentPack } from "../types";
 import { MoveSheet } from "./MoveSheet";
 import { CharacterTab, JournalTab, MetersBar, MovesTab, OraclesTab, TracksTab } from "./Tabs";
+import { Wizard } from "./Wizard";
 import { entryText, journalMarkdown, type Note } from "./text";
 import "./iw.css";
 
@@ -73,6 +74,9 @@ function Game({ host }: { host: Host }) {
   const tRef = useRef(t);
   tRef.current = t;
   useWakeLock(true);
+  // A new campaign opens the character wizard; the first visit ever shows a short how-to-play.
+  const [fresh, setFresh] = useState(false);
+  const [intro, setIntro] = useState(() => !host.getSetting<boolean>("iw.intro"));
 
   useEffect(() => {
     loadContent(host)
@@ -101,6 +105,7 @@ function Game({ host }: { host: Host }) {
     const id = `${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}-${Math.floor(Math.random() * 1e4)}`;
     campaign.current = new Campaign(makeEngine(pack), GAME, id, name || t("game.title"), newCampaign(newSeed(), name));
     setNotes([]);
+    setFresh(true);
     save([]);
     rerender();
   };
@@ -111,6 +116,7 @@ function Game({ host }: { host: Host }) {
       const { campaign: c, fellBack } = Campaign.fromSave(makeEngine(pack), f.save);
       campaign.current = c;
       setNotes(f.notes ?? []);
+      setFresh(false);
       if (fellBack) push(t("toast.fellBack"), "bad");
       rerender();
     } catch (e) {
@@ -194,6 +200,31 @@ function Game({ host }: { host: Host }) {
       <>
         <CampaignList list={list} create={create} open={open} remove={(p) => void remove(p)} exit={host.exit} openRules={() => setRules(null)} />
         <Toasts toasts={toasts} />
+        {intro && (
+          <Sheet
+            title={t("intro.title")}
+            onClose={() => {
+              setIntro(false);
+              void host.setSetting("iw.intro", true);
+            }}
+          >
+            <div className="iw-intro" data-testid="intro">
+              <p>{t("intro.1")}</p>
+              <p>{t("intro.2")}</p>
+              <p>{t("intro.3")}</p>
+              <button
+                className="br-btn is-primary is-block"
+                onClick={() => {
+                  setIntro(false);
+                  void host.setSetting("iw.intro", true);
+                }}
+                data-testid="intro-ok"
+              >
+                {t("intro.ok")}
+              </button>
+            </div>
+          </Sheet>
+        )}
         {rulesView}
       </>
     );
@@ -208,6 +239,7 @@ function Game({ host }: { host: Host }) {
         undo={undo}
         back={() => void back()}
         openRules={(topic) => setRules(topic ?? null)}
+        startWizard={fresh}
         addNote={(text) => {
           const next = [...notes, { at: c.journal.length, text, time: new Date().toISOString() }];
           setNotes(next);
@@ -297,8 +329,10 @@ function CampaignView(props: {
   addNote: (text: string) => void;
   exportIt: () => void;
   toggleLang: () => void;
+  startWizard?: boolean;
 }) {
   const { t } = useLang();
+  const [wizard, setWizard] = useState(!!props.startWizard);
   const [tab, setTab] = useState<Tab>("moves");
   const [move, setMove] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
@@ -325,9 +359,9 @@ function CampaignView(props: {
           ⋯
         </button>
       </header>
-      <MetersBar state={state} act={props.act} />
+      <MetersBar state={state} act={props.act} openRules={props.openRules} />
       <main className={`iw-main${state.pending && !moveDef ? " has-pending" : ""}`}>
-        {tab === "character" && <CharacterTab state={state} pack={props.pack} act={props.act} />}
+        {tab === "character" && <CharacterTab state={state} pack={props.pack} act={props.act} openRules={props.openRules} />}
         {tab === "moves" && <MovesTab pack={props.pack} open={openMove} />}
         {tab === "tracks" && <TracksTab state={state} pack={props.pack} act={props.act} openMove={openMove} />}
         {tab === "oracles" && <OraclesTab pack={props.pack} act={props.act} last={c.journal.at(-1)} />}
@@ -340,7 +374,8 @@ function CampaignView(props: {
           </button>
         ))}
       </nav>
-      {moveDef && <MoveSheet key={moveDef.id} move={moveDef} state={state} pack={props.pack} act={props.act} onClose={() => setMove(null)} openMove={openMove} rollOracle={rollOracle} />}
+      {moveDef && <MoveSheet key={moveDef.id} move={moveDef} state={state} pack={props.pack} act={props.act} onClose={() => setMove(null)} openMove={openMove} rollOracle={rollOracle} openRules={props.openRules} />}
+      {wizard && <Wizard state={state} pack={props.pack} act={props.act} onClose={() => setWizard(false)} openMove={openMove} openRules={props.openRules} />}
       {!moveDef && state.pending && (
         <button
           className="iw-pending"
@@ -369,6 +404,16 @@ function CampaignView(props: {
             data-testid="menu-rules"
           >
             📖 {t("menu.rules")}
+          </button>
+          <button
+            className="br-btn is-block"
+            onClick={() => {
+              setMenu(false);
+              setWizard(true);
+            }}
+            data-testid="menu-wizard"
+          >
+            🧭 {t("wiz.reopen")}
           </button>
           <button className="br-btn is-block" onClick={props.exportIt} data-testid="menu-export">
             ⬆︎ {t("menu.export")}

@@ -516,3 +516,40 @@
 .br-root .iw-chip.is-disabled {
   opacity: 0.6;
 }
+.iw-wiz {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.iw-grow {
+  flex: 1;
+}
+.iw-wiz-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.6fr;
+  gap: 8px;
+  margin-top: 8px;
+  position: sticky;
+  bottom: 0;
+  background: var(--br-panel);
+  padding: 8px 0 4px;
+}
+.iw-truth {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--br-line);
+  padding-top: 8px;
+}
+.br-root .iw-pick.is-on,
+.br-root .iw-stat.is-on {
+  border-color: var(--br-accent);
+  background: color-mix(in srgb, var(--br-accent) 18%, var(--br-panel-2));
+}
+.iw-intro p {
+  line-height: 1.7;
+  margin: 0 0 10px;
+}
+.iw-rulelink {
+  align-self: flex-start;
+}
