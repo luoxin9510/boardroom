@@ -50,6 +50,7 @@ export function parseContent(notes: { path: string; text: string }[]): ContentPa
       villageFile = path;
     } else if (type === "warrens") {
       warrens = { image: str(note.meta.image), fields: num(note.meta.fields) ?? 6 };
+      if (warrens.fields !== 6) throw new ContentError(path, 1, `fields: ${warrens.fields}; the Goblin Warrens has 6 fields`);
     } else throw new ContentError(path, 2, `unknown type "${String(type)}" (tunnel | special | village | warrens)`);
   }
 
@@ -123,6 +124,7 @@ function parseLocation(
   const second = parseEffects(file, line, get("reward2"));
   const passive = first.passive ?? second.passive;
   const slots: Slot[] = [];
+  if (!first.effects.length && (second.effects.length || cost)) throw new ContentError(file, line, "fill in 奖励 (reward) first; 奖励② and 费用 only add to it");
   if (first.effects.length) slots.push({ cost: cost + first.cost, effects: first.effects });
   if (second.effects.length) slots.push({ cost: second.cost, effects: second.effects });
   const repeatRaw = get("repeat");

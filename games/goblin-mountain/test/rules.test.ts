@@ -317,3 +317,47 @@ describe("messages", () => {
     for (const k of keys) expect(messages.zh[k], k).toBeDefined();
   });
 });
+
+describe("review fixes", () => {
+  it("a die that survives under the King takes a hit for every later step", () => {
+    const s = game(Array.from({ length: 14 }, (_, i) => `L${i}`));
+    s.king = KING_TRACK + 2;
+    s.villageOpen = true;
+    s.dice.yellow = { color: "yellow", strength: 1, pos: { at: "track", i: 2 } };
+    s.dice.black = { color: "black", strength: 3, pos: { at: "track", i: 10 } };
+    s.dice.blue = { color: "blue", strength: 0, pos: { at: "captured" } };
+    s.stealth = { yellow: 6, orange: null, blue: null, black: 6 };
+    // 3 steps: the first catches yellow (no free hit any more), the other 2 move him on.
+    const { state } = play(s, { t: "move", color: "orange", to: 12 });
+    expect(state.dice.yellow.pos).toEqual({ at: "captured" });
+    expect(state.king).toBe(KING_TRACK + 4);
+  });
+  it("the King reaches the start on Warrens field 1 and enters the tunnel on the next step", () => {
+    const s = game(["a", "b", "c"]);
+    for (const c of COLORS) s.dice[c].pos = { at: "track", i: 0 };
+    s.dice.yellow.pos = { at: "track", i: 1 };
+    s.dice.orange.pos = { at: "track", i: 2 };
+    s.dice.blue = { color: "blue", strength: 0, pos: { at: "captured" } };
+    s.dice.black = { color: "black", strength: 0, pos: { at: "captured" } };
+    s.king = 4; // field 2
+    const r1 = play(s, { t: "pass" });
+    expect(r1.state.king).toBe(KING_START);
+    expect(r1.state.villageOpen).toBe(false);
+    const r2 = play(r1.state, { t: "pass" });
+    expect(r2.state.king).toBe(KING_TRACK);
+    expect(r2.state.villageOpen).toBe(true);
+  });
+  it("rejects reward ② or a cost without a first reward, and a Warrens without 6 fields", () => {
+    const edit = (from: string, to: string) => fixtureNotes().map((n) => (n.path.endsWith("/A.md") ? { ...n, text: n.text.replace(from, to) } : n));
+    expect(() => parseContent(edit("| 设为5 | 付宝藏1 设为4 |", "|  | 付宝藏1 设为4 |"))).toThrow(/reward/);
+    expect(() => parseContent(edit("| | 宝藏+2 | | |", "| 付宝藏2 |  | | |"))).toThrow(/reward/);
+    const bad = fixtureNotes().map((n) => (n.path.endsWith("巢穴.md") ? { ...n, text: n.text.replace("fields: 6", "fields: 5") } : n));
+    expect(() => parseContent(bad)).toThrow(/6 fields/);
+  });
+  it("manual King moves are refused while a hit is pending", () => {
+    const s = game(["a"]);
+    s.phase = "kingHit";
+    s.pending = { kind: "kingHit", where: -1, steps: 0, free: true };
+    expect(() => play(s, { t: "manual", target: "king", value: 3 })).toThrow(RuleError);
+  });
+});

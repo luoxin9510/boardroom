@@ -3,10 +3,11 @@ import { score, type Action, type Options, type State } from "./engine";
 import { CARD_FOLDER } from "./content";
 import { COLORS } from "./types";
 
-/** File name for the record note: date, game, result. */
+/** File name for the record note: local date and time, game, result. The host adds " 2", " 3"… if taken. */
 export function recordPath(state: State, t: T, date = new Date()): string {
-  const d = date.toISOString().slice(0, 10);
-  const time = date.toTimeString().slice(0, 5).replace(":", "");
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const d = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const time = `${pad(date.getHours())}${pad(date.getMinutes())}`;
   const sc = score(state);
   const result = sc.won ? `${sc.total} ${t("res.fame")}` : t("over.lost");
   return `对局/${d}-${time} ${t("game.title")} ${result}.md`;

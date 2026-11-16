@@ -16,9 +16,12 @@ export interface Options {
   difficulty: "normal" | "hard";
 }
 
-/** The Goblin King's place: 0–5 are Warrens fields 6…1, 6 is the start, 7+i is track[i]. */
-export const KING_START = 6;
-export const KING_TRACK = 7;
+/**
+ * The Goblin King's place: 0–5 are Warrens fields 6…1. Field 1 (5) is also the start, where the
+ * adventurers begin (rules: "your dice go on the last field of the Warrens"). 6+i is track[i].
+ */
+export const KING_START = 5;
+export const KING_TRACK = 6;
 
 export interface PendingHit {
   kind: "kingHit";
@@ -109,7 +112,7 @@ export function makeEngine(pack: ContentPack): Engine<State, Action, Event, Opti
 
 export function setup(pack: ContentPack, seed: number, options: Options): State {
   const r = { rng: seed >>> 0 || 1 };
-  const special = pack.specials.find((s) => s.difficulty === options.difficulty) ?? pack.specials[0];
+  const special = pack.specials.find((s) => s.difficulty === options.difficulty);
   if (!special) throw new RuleError("err.noSpecial");
   const order = shuffle(r, pack.cards).map((c) => {
     const side = c.sides.length > 1 ? c.sides[Math.floor(rollDie(r, c.sides.length) - 1)] : c.sides[0];
@@ -483,6 +486,16 @@ function nextTurn(s: State, ev: Event[]): void {
 /** Moves the King step by step; stops at the first location with dice (Ruling 3). */
 function advanceKing(s: State, steps: number, ev: Event[]): void {
   const last = KING_TRACK + s.track.length; // the village
+  // A die still standing where the King already is (it survived last turn, or just moved there)
+  // takes a hit for every step; the King moves on only once nobody is left there (Ruling 3).
+  const here = kingWhere(s);
+  if (steps > 0 && here !== null && diceHere(s, here).length > 0) {
+    s.pending = { kind: "kingHit", where: here, steps, free: false };
+    resolveHits(s, ev);
+    if (waitingForHit(s)) return;
+    steps = s.pending ? s.pending.steps : steps;
+    s.pending = null;
+  }
   while (steps > 0 && s.king < last) {
     const from = s.king;
     s.king++;
@@ -547,6 +560,7 @@ function hit(s: State, color: Color, ev: Event[]): void {
 function manual(s: State, a: Extract<Action, { t: "manual" }>, ev: Event[]): void {
   const v = Math.round(a.value);
   if (a.target === "king") {
+    need(s.phase === "move" || s.phase === "over", "err.phase");
     s.king = Math.max(0, Math.min(KING_TRACK + s.track.length, v));
     if (s.king >= KING_TRACK) s.villageOpen = true;
     return;

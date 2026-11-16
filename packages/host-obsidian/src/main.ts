@@ -76,11 +76,14 @@ class GameView extends ItemView {
     const game = await this.gameId();
     const mountGame = game ? GAMES[game] : undefined;
     if (!mountGame) {
+      // Keep Obsidian's chrome so the user is never stuck on this screen.
+      this.plugin.setImmersive(false);
       el.createEl("p", {
         text: game
           ? `Boardroom: unknown game "${game}" in ${CONFIG}.`
           : `Boardroom: this vault has no ${CONFIG}. Add one with {"game": "goblin-mountain"}.`,
       });
+      el.createEl("button", { text: "Close / 关闭" }).addEventListener("click", () => this.leaf.detach());
       return;
     }
     const root = el.createDiv({ cls: "boardroom-mount" });
@@ -110,7 +113,7 @@ class GameView extends ItemView {
     const plugin = this.plugin;
     const ensureFolder = async (path: string) => {
       const dir = path.split("/").slice(0, -1).join("/");
-      if (dir && !(await adapter.exists(dir))) await adapter.mkdir(dir);
+      if (dir && !(await adapter.exists(dir))) await vault.createFolder(dir);
     };
     return {
       async readNotes(folder) {
@@ -130,7 +133,7 @@ class GameView extends ItemView {
         await ensureFolder(p);
         const f = vault.getAbstractFileByPath(p);
         if (f instanceof TFile) await vault.modify(f, text);
-        else if (p.endsWith(".md")) await vault.create(p, text);
+        else if (p.endsWith(".md") && !(await adapter.exists(p))) await vault.create(p, text);
         else await adapter.write(p, text);
       },
       async listFiles(folder) {

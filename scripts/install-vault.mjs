@@ -30,6 +30,8 @@ if (args.includes("--fixtures")) {
     console.error("vault already has 卡牌/; refusing to overwrite (use --force on a test vault)");
     process.exit(1);
   }
-  cpSync(fx, vault, { recursive: true });
+  cpSync(join(fx, "卡牌"), join(vault, "卡牌"), { recursive: true, force: true });
+  const cfg = join(vault, "boardroom.json");
+  if (!existsSync(cfg)) cpSync(join(fx, "boardroom.json"), cfg);
 }
 console.log(`installed boardroom into ${dest}`);

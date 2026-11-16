@@ -41,6 +41,8 @@ function Game({ host }: { host: Host }) {
   const [menu, setMenu] = useState<"none" | "menu" | "manual">("none");
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const session = useRef<GmSession | null>(null);
+  /** Saves are written one after another, so an older save can never land after a newer one. */
+  const writes = useRef<Promise<void>>(Promise.resolve());
   const [, rerender] = useReducer((x: number) => x + 1, 0);
   const tRef = useRef(t);
   tRef.current = t;
@@ -73,9 +75,10 @@ function Game({ host }: { host: Host }) {
       const s = session.current;
       if (!s) return;
       const data: GmSave = { ...s.toSave(), finished };
-      void host.writeFile(savePath(data), JSON.stringify(data));
+      const text = JSON.stringify(data);
+      writes.current = writes.current.then(() => host.writeFile(savePath(data), text)).catch((e: unknown) => push(tRef.current("toast.saveFailed", { detail: String(e) }), "bad"));
     },
-    [host],
+    [host, push],
   );
 
   const start = (options: Options) => {
@@ -118,6 +121,7 @@ function Game({ host }: { host: Host }) {
     if (!s?.canUndo) return;
     s.undo();
     save();
+    setSavedPath(null);
     push(t("toast.undone"));
     rerender();
   };
@@ -133,7 +137,10 @@ function Game({ host }: { host: Host }) {
   const writeRecord = async () => {
     const s = session.current;
     if (!s) return;
-    const path = recordPath(s.state, t);
+    // Never overwrite an earlier record: add " 2", " 3"… when the name is taken.
+    const base = recordPath(s.state, t).replace(/\.md$/, "");
+    let path = `${base}.md`;
+    for (let n = 2; (await host.readFile(path)) !== null; n++) path = `${base} ${n}.md`;
     await host.writeFile(path, recordNote(s.state, s.toSave(), t));
     setSavedPath(path);
   };
@@ -155,11 +162,12 @@ function Game({ host }: { host: Host }) {
       <div className="gm-screen gm-start">
         <h1>{t("game.title")}</h1>
         <div className="gm-muted">{t("game.subtitle")}</div>
-        {latest && !latest.finished && (
+        {latest && !latest.finished && latest.contentHash === pack.hash && (
           <button className="br-btn is-primary is-block" onClick={() => resume(latest)} data-testid="continue">
             {t("start.continue")}
           </button>
         )}
+        {latest && !latest.finished && latest.contentHash !== pack.hash && <div className="gm-muted" data-testid="changed">{t("start.changed")}</div>}
         <div className="gm-muted gm-gap">{t("start.pick")}</div>
         {(["normal", "hard"] as const).map((d) => (
           <button key={d} className="br-btn is-block" onClick={() => start({ difficulty: d })} data-testid={`new-${d}`}>
