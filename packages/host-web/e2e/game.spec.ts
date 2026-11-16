@@ -177,3 +177,71 @@ test("works offline once loaded", async ({ page, context, browserName }) => {
   await expect(page.getByTestId("new-normal")).toBeVisible();
   void browserName;
 });
+
+test("the tutorial walks through a first game", async ({ page }) => {
+  await demo(page);
+  await expect(page.getByTestId("first-run")).toBeVisible();
+  await page.getByTestId("first-run-yes").tap();
+  const next = page.getByTestId("coach-next");
+  for (const id of ["intro", "dice", "track", "king"]) {
+    await expect(page.getByTestId(`coach-${id}`)).toBeVisible();
+    await next.tap();
+  }
+  await expect(page.getByTestId("coach-pick")).toBeVisible();
+  await page.getByTestId("die-yellow").tap();
+  await expect(page.getByTestId("coach-place")).toBeVisible();
+  await page.locator(".gm-slot.is-glow").first().tap();
+  await expect(page.getByTestId("coach-act")).toBeVisible();
+  await page.getByTestId("act").tap();
+  await expect(page.getByTestId("coach-after")).toBeVisible();
+  await next.tap();
+  await expect(page.getByTestId("coach-behind")).toBeVisible();
+  await page.locator(".gm-tray .gm-die:not(.is-dim)").first().tap();
+  await page.locator(".gm-slot.is-glow").first().tap();
+  if (await page.getByTestId("done").isVisible()) await page.getByTestId("done").tap();
+  for (const id of ["fate", "village"]) {
+    await expect(page.getByTestId(`coach-${id}`)).toBeVisible();
+    await next.tap();
+  }
+  await expect(page.getByTestId("coach-done")).toBeVisible();
+  await next.tap();
+  await expect(page.getByTestId("coach")).toHaveCount(0);
+  // The tutorial game is not saved: back on the start screen there is nothing to continue, and no first-run prompt.
+  await page.getByTestId("menu").tap();
+  await page.getByText("放弃这局，重新开始").tap();
+  await expect(page.getByTestId("continue")).toHaveCount(0);
+  await expect(page.getByTestId("first-run")).toHaveCount(0);
+});
+
+test("rules open from the start screen and jump to a topic from a hint", async ({ page }) => {
+  await demo(page);
+  await page.getByTestId("open-rules").tap();
+  await expect(page.getByTestId("rules")).toContainText("测试卡 · 规则简介");
+  await page.getByText("命运", { exact: true }).tap();
+  await expect(page.getByTestId("rules")).toContainText("交换两颗骰子");
+  await page.getByTestId("rules-close").tap();
+  await page.getByTestId("first-run-no").tap();
+  await page.getByTestId("new-normal").tap();
+  await page.getByTestId("hint").getByRole("button", { name: "单人规则" }).tap();
+  await expect(page.locator("#topic-solo")).toBeAttached();
+  await expect(page.getByTestId("rules")).toContainText("开局所有骰子是 3");
+  await page.getByTestId("rules-close").tap();
+  await expect(page.getByTestId("rules")).toHaveCount(0);
+});
+
+test("a tutorial leaves the saved game's continue in place", async ({ page }) => {
+  await demo(page);
+  await page.getByTestId("first-run-no").tap();
+  await page.getByTestId("new-normal").tap();
+  await page.locator(".gm-tray .gm-die:not(.is-dim)").first().tap();
+  await page.locator(".gm-slot.is-glow").first().tap();
+  if (await page.getByTestId("done").isVisible()) await page.getByTestId("done").tap();
+  await page.reload();
+  await demo(page);
+  await expect(page.getByTestId("continue")).toBeVisible();
+  await page.getByTestId("tutorial").tap();
+  await page.getByTestId("coach-skip").tap();
+  await page.getByTestId("menu").tap();
+  await page.getByText("放弃这局，重新开始").tap();
+  await expect(page.getByTestId("continue")).toBeVisible();
+});

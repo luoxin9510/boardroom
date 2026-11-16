@@ -361,3 +361,28 @@ describe("review fixes", () => {
     expect(() => play(s, { t: "manual", target: "king", value: 3 })).toThrow(RuleError);
   });
 });
+
+describe("tutorial", () => {
+  it("plays on its own built-in cards, with yellow able to move first", async () => {
+    const { tutorialPack, TUTORIAL_SEED, TUTORIAL } = await import("../src/tutorial");
+    const s = setup(tutorialPack(), TUTORIAL_SEED, { difficulty: "normal" });
+    expect(targets(s, "yellow").length).toBeGreaterThan(0);
+    for (const step of TUTORIAL) expect(messages.zh[`tut.${step.id}`], step.id).toBeDefined();
+  });
+  it("links in messages only point at topics the rules notes define", () => {
+    const fixtures = readFileSync(join(__dirname, "../../../fixtures/goblin-mountain/规则/规则.md"), "utf8");
+    const defined = new Set([...fixtures.matchAll(/<!-- topic: ([\w-]+) -->/g)].map((m) => m[1]));
+    for (const table of [messages.zh, messages.en])
+      for (const text of Object.values(table)) for (const m of String(text).matchAll(/\]\(rule:([\w-]+)\)/g)) expect(defined, m[1]).toContain(m[1]);
+  });
+});
+
+describe("tutorial cards", () => {
+  it("match the test cards they were generated from (minus images)", async () => {
+    const { TUTORIAL_NOTES } = await import("../src/tutorial-cards");
+    const fresh = fixtureNotes()
+      .map((n) => ({ path: n.path, text: n.text.replace(/^image: .*\n/m, "") }))
+      .sort((a, b) => a.path.localeCompare(b.path));
+    expect([...TUTORIAL_NOTES].sort((a, b) => a.path.localeCompare(b.path))).toEqual(fresh);
+  });
+});

@@ -2,6 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { translator, type Lang, type Messages, type T } from "@boardroom/core";
 import "./ui.css";
 
+export { Blocks, inline, parseBlocks, RichText, splitFrontmatter, type Block, type MdContext } from "./markdown";
+export { pickRules, RulesView, sections, type RulesLabels } from "./rules";
+
 // ───────────── language ─────────────
 
 interface LangCtx {

@@ -37,7 +37,7 @@
 ```
 packages/
   core/            种子随机、对局会话（动作日志、撤销、存档）、待选、i18n、公共类型
-  ui/              React 外壳：底部面板、按钮、语言切换、提示、加减器、屏幕常亮、主题
+  ui/              React 外壳：底部面板、按钮、语言切换、提示、加减器、屏幕常亮、主题；安全的 Markdown 渲染和规则页（RulesView）
   host-web/        PWA：书架页、内容包导入、IndexedDB 存储、service worker、manifest；e2e 跑在它的生产构建上
 games/
   goblin-mountain/ 规则引擎、内容包解析和校验、游戏界面、zh/en 文案

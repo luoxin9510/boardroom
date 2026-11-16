@@ -469,3 +469,70 @@
     font-size: 18px;
   }
 }
+
+/* first run, links */
+.gm-firstrun {
+  background: var(--br-panel);
+  border: 1px solid var(--br-accent);
+  border-radius: var(--br-radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gm-grow {
+  flex: 1;
+}
+.gm-underline {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* tutorial coach */
+.gm-coach {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+}
+.gm-coach-ring {
+  position: fixed;
+  border: 3px solid var(--br-accent);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35), 0 0 18px rgba(226, 169, 59, 0.7);
+  transition: all 0.2s ease-out;
+}
+.gm-coach-bubble {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  pointer-events: auto;
+  background: #fbf6ea;
+  color: #1b1a17;
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.gm-coach-bubble.is-center {
+  top: 30%;
+}
+.gm-coach-count {
+  font-size: 12px;
+  color: #7a6f5c;
+}
+.gm-coach-bubble .br-md-link {
+  color: #a8670b;
+}
+.gm-coach-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.gm-coach-bubble .br-btn.is-quiet {
+  color: #5d5547;
+}

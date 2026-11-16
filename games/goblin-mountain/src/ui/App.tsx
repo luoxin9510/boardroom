@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { ContentError, langFromLocale, newSeed, RuleError, Session, type Host, type Lang, type SaveData } from "@boardroom/core";
-import { LangProvider, Sheet, Toasts, useLang, useToasts, useWakeLock } from "@boardroom/ui";
+import { LangProvider, RulesView, Sheet, Toasts, useLang, useToasts, useWakeLock } from "@boardroom/ui";
 import { CARD_FOLDER, parseContent } from "../content";
 import { makeEngine, score, type Action, type Event, type Options, type State } from "../engine";
 import { messages } from "../messages";
@@ -8,6 +8,8 @@ import { recordName, recordNote } from "../record";
 import type { ContentPack } from "../types";
 import { Board, ManualSheet } from "./Board";
 import { feed } from "./text";
+import { Coach } from "./Coach";
+import { TUTORIAL_SEED, tutorialPack } from "../tutorial";
 import "./gm.css";
 
 type GmSession = Session<State, Action, Event, Options>;
@@ -15,6 +17,7 @@ type GmSave = SaveData<Action, Options> & { finished?: boolean };
 
 const GAME = "goblin-mountain";
 const SAVE_DIR = "对局/存档";
+const RULES_FOLDER = "规则";
 
 export function App(props: { host: Host }) {
   const { host } = props;
@@ -33,13 +36,21 @@ export function App(props: { host: Host }) {
 }
 
 function Game({ host }: { host: Host }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const { toasts, push } = useToasts();
   const [pack, setPack] = useState<ContentPack | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [latest, setLatest] = useState<GmSave | null>(null);
   const [menu, setMenu] = useState<"none" | "menu" | "manual">("none");
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [rulesNotes, setRulesNotes] = useState<{ path: string; text: string }[]>([]);
+  /** undefined: rules closed; null: open at the top; a string: open at that topic. */
+  const [rules, setRules] = useState<string | null | undefined>(undefined);
+  /** The tutorial's current step, or null when no tutorial is running. */
+  const [tutStep, setTutStep] = useState<number | null>(null);
+  /** The tutorial game is never saved, so it can't replace the player's real "continue". */
+  const tutorial = useRef(false);
+  const [seenTutorial, setSeenTutorial] = useState(() => host.getSetting<boolean>("tutorialSeen") === true);
   const session = useRef<GmSession | null>(null);
   /** Saves are written one after another, so an older save can never land after a newer one. */
   const writes = useRef<Promise<void>>(Promise.resolve());
@@ -64,6 +75,7 @@ function Game({ host }: { host: Host }) {
   useEffect(() => {
     void load();
     void findLatest(host).then(setLatest);
+    void host.readNotes(RULES_FOLDER).then(setRulesNotes).catch(() => setRulesNotes([]));
     return host.onContentChange(() => {
       void load();
       if (session.current) push(tRef.current("toast.contentChanged"));
@@ -73,7 +85,7 @@ function Game({ host }: { host: Host }) {
   const save = useCallback(
     (finished = false) => {
       const s = session.current;
-      if (!s) return;
+      if (!s || tutorial.current) return;
       const data: GmSave = { ...s.toSave(), finished };
       const text = JSON.stringify(data);
       writes.current = writes.current.then(() => host.writeFile(savePath(data), text)).catch((e: unknown) => push(tRef.current("toast.saveFailed", { detail: String(e) }), "bad"));
@@ -84,6 +96,8 @@ function Game({ host }: { host: Host }) {
   const start = (options: Options) => {
     if (!pack) return;
     session.current = new Session(makeEngine(pack), GAME, pack.hash, newSeed(), options);
+    tutorial.current = false;
+    setTutStep(null);
     setSavedPath(null);
     save();
     rerender();
@@ -93,6 +107,8 @@ function Game({ host }: { host: Host }) {
     if (!pack) return;
     const { session: s, stoppedAt } = Session.fromSave(makeEngine(pack), data);
     session.current = s;
+    tutorial.current = false;
+    setTutStep(null);
     if (stoppedAt !== null) push(t("toast.replayStopped", { n: stoppedAt }), "bad");
     setSavedPath(null);
     rerender();
@@ -126,12 +142,35 @@ function Game({ host }: { host: Host }) {
     rerender();
   };
 
+  /** A guided game on the built-in tutorial cards. Leaves any saved game alone. */
+  const startTutorial = () => {
+    const tp = tutorialPack();
+    session.current = new Session(makeEngine(tp), GAME, tp.hash, TUTORIAL_SEED, { difficulty: "normal" });
+    tutorial.current = true;
+    setTutStep(0);
+    setMenu("none");
+    setSavedPath(null);
+    markSeen();
+    rerender();
+  };
+
+  const markSeen = () => {
+    setSeenTutorial(true);
+    void host.setSetting("tutorialSeen", true);
+  };
+
+  /** Leaves the current game for the start screen. A real game is marked finished; a tutorial game never touched the saves. */
   const abandon = () => {
+    const wasTutorial = tutorial.current;
     save(true);
+    tutorial.current = false;
+    setTutStep(null);
     session.current = null;
-    setLatest(null);
+    if (!wasTutorial) setLatest(null);
     setMenu("none");
     rerender();
+    // Once the save queue is written, look again: "continue" must reflect what is really stored.
+    void writes.current.then(() => findLatest(host)).then(setLatest);
   };
 
   /** Exports the game as a markdown note (share sheet or download), ready to drop into a vault. */
@@ -147,6 +186,19 @@ function Game({ host }: { host: Host }) {
       if ((e as Error)?.name !== "AbortError") push(t("toast.saveFailed", { detail: String(e) }), "bad");
     }
   };
+
+  const rulesImage = (name: string) => host.imageUrl(`${RULES_FOLDER}/图/${name}`) ?? host.imageUrl(`${RULES_FOLDER}/${name}`) ?? host.imageUrl(`${CARD_FOLDER}/图/${name}`);
+  const rulesView =
+    rules === undefined ? null : (
+      <RulesView
+        notes={rulesNotes}
+        lang={lang}
+        image={rulesImage}
+        topic={rules}
+        labels={{ title: t("rules.title"), empty: t("rules.empty"), close: t("rules.close") }}
+        onClose={() => setRules(undefined)}
+      />
+    );
 
   if (error) {
     return (
@@ -165,6 +217,19 @@ function Game({ host }: { host: Host }) {
       <div className="gm-screen gm-start">
         <h1>{t("game.title")}</h1>
         <div className="gm-muted">{t("game.subtitle")}</div>
+        {!seenTutorial && (
+          <div className="gm-firstrun" data-testid="first-run">
+            <div>{t("start.firstRun")}</div>
+            <div className="gm-row">
+              <button className="br-btn is-primary" onClick={startTutorial} data-testid="first-run-yes">
+                {t("start.tutorialYes")}
+              </button>
+              <button className="br-btn is-quiet" onClick={markSeen} data-testid="first-run-no">
+                {t("start.tutorialNo")}
+              </button>
+            </div>
+          </div>
+        )}
         {latest && !latest.finished && latest.contentHash === pack.hash && (
           <button className="br-btn is-primary is-block" onClick={() => resume(latest)} data-testid="continue">
             {t("start.continue")}
@@ -177,9 +242,17 @@ function Game({ host }: { host: Host }) {
             {t("start.new")} · {t(`difficulty.${d}`)}
           </button>
         ))}
-        <div className="gm-muted gm-gap">{t("start.rules")}</div>
+        <div className="gm-row gm-gap">
+          <button className="br-btn gm-grow" onClick={startTutorial} data-testid="tutorial">
+            🎓 {t("menu.tutorial")}
+          </button>
+          <button className="br-btn gm-grow" onClick={() => setRules(null)} data-testid="open-rules">
+            📖 {t("menu.rules")}
+          </button>
+        </div>
         {host.exit && <button className="br-btn is-quiet" onClick={host.exit}>{t("menu.exit")}</button>}
         <Toasts toasts={toasts} />
+        {rulesView}
       </div>
     );
   }
@@ -188,9 +261,35 @@ function Game({ host }: { host: Host }) {
   const sc = state.phase === "over" ? score(state) : null;
   return (
     <>
-      <Board state={state} imageUrl={(p) => host.imageUrl(p)} act={act} canUndo={s.canUndo} undo={undo} openMenu={() => setMenu("menu")} exit={host.exit} />
+      <Board
+        state={state}
+        imageUrl={(p) => host.imageUrl(p)}
+        act={act}
+        canUndo={s.canUndo}
+        undo={undo}
+        openMenu={() => setMenu("menu")}
+        exit={host.exit}
+        openRules={(topic) => setRules(topic ?? null)}
+        coach={
+          tutStep === null
+            ? undefined
+            : (view) => <Coach view={view} step={tutStep} onStep={setTutStep} onEnd={() => setTutStep(null)} onTopic={(topic) => setRules(topic)} />
+        }
+      />
       {menu === "menu" && (
-        <MenuSheet onClose={() => setMenu("none")} canUndo={s.canUndo} undo={undo} manual={() => setMenu("manual")} restart={abandon} exit={host.exit} />
+        <MenuSheet
+          onClose={() => setMenu("none")}
+          canUndo={s.canUndo}
+          undo={undo}
+          manual={() => setMenu("manual")}
+          rules={() => {
+            setMenu("none");
+            setRules(null);
+          }}
+          tutorial={startTutorial}
+          restart={abandon}
+          exit={host.exit}
+        />
       )}
       {menu === "manual" && <ManualSheet s={state} act={act} onClose={() => setMenu("none")} />}
       {sc && (
@@ -228,16 +327,23 @@ function Game({ host }: { host: Host }) {
         </div>
       )}
       <Toasts toasts={toasts} />
+      {rulesView}
     </>
   );
 }
 
-function MenuSheet(props: { onClose: () => void; canUndo: boolean; undo: () => void; manual: () => void; restart: () => void; exit?: () => void }) {
+function MenuSheet(props: { onClose: () => void; canUndo: boolean; undo: () => void; manual: () => void; rules: () => void; tutorial: () => void; restart: () => void; exit?: () => void }) {
   const { t, lang, setLang } = useLang();
   return (
     <Sheet title={t("menu.title")} onClose={props.onClose}>
       <button className="br-btn is-block" disabled={!props.canUndo} onClick={props.undo}>
         ↶ {t("menu.undo")}
+      </button>
+      <button className="br-btn is-block" onClick={props.rules} data-testid="menu-rules">
+        📖 {t("menu.rules")}
+      </button>
+      <button className="br-btn is-block" onClick={props.tutorial} data-testid="menu-tutorial">
+        🎓 {t("menu.tutorial")}
       </button>
       <button className="br-btn is-block" onClick={props.manual} data-testid="manual">
         {t("menu.manual")}
