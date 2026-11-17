@@ -212,6 +212,15 @@ describe("scenario review fixes", () => {
     expect(c.state.story?.chose).toBe("安慰她，问守塔人的事");
   });
 
+  it("#journey makes a journey track", () => {
+    const c = new Campaign(makeEngine(parseContent(withMain(main.replace("# fx: momentum+2", "# journey: 去灯塔 / dangerous")))), "ironsworn", "c", "T", campaign().state);
+    c.act({ t: "storyStart", story: "fog-lighthouse" });
+    c.act({ t: "roll", move: "befriend", stat: "heart", dice: STRONG });
+    c.act({ t: "storyChoose", index: 0 });
+    expect(c.state.tracks.find((t) => t.kind === "journey")).toMatchObject({ name: "去灯塔", rank: "dangerous" });
+    expect(() => parseContent(withMain(main.replace("# fx: momentum+2", "# journey: 去灯塔 / far")))).toThrow(/rank must be one of/);
+  });
+
   it("move and oracle pointers in #fx wait on the page; the story can't end over them", () => {
     const c = new Campaign(makeEngine(parseContent(withMain(main.replace("# fx: spirit-1", "# fx: move:toll")))), "ironsworn", "c", "T", campaign().state);
     c.act({ t: "storyStart", story: "fog-lighthouse" });
