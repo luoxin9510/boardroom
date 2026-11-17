@@ -31,7 +31,7 @@ for (const f of FOLDERS) {
     process.exit(1);
   }
 }
-const KEEP = /\.(md|jpe?g|png|webp|gif|svg)$/i;
+const KEEP = /\.(md|ink|jpe?g|png|webp|gif|svg)$/i;
 const IMAGE = /\.(jpe?g|png|webp|gif)$/i;
 
 const files = { "boardroom.json": [readFileSync(configPath), { level: 6 }] };

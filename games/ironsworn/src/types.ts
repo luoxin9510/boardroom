@@ -91,6 +91,8 @@ export interface Truth {
 }
 
 export interface ContentPack {
+  /** Scenarios from 剧本/ (may be empty). */
+  stories: import("./story").StoryDef[];
   moves: Move[];
   assets: Asset[];
   oracles: Oracle[];

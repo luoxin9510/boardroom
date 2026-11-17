@@ -101,7 +101,7 @@ scripts/
 
 双人同屏、联机（需要 Mac 或 VPS 当服务器）、对局统计、下一款游戏、恢复 Zombicide。
 
-游戏进度：[哥布林山脉](games/goblin-mountain.md) 收尾（2026-11-16，M0–M2 完成，M3 暂缓）；[Zombicide 黑死病](games/zombicide-black-plague.md) 暂停。[铁誓 Ironsworn](games/ironsworn.md) M0 引擎、M1 界面、M2 作者内容（私人 vault）完成，M3 建角向导。
+游戏进度：[哥布林山脉](games/goblin-mountain.md) 收尾（2026-11-16，M0–M2 完成，M3 暂缓）；[Zombicide 黑死病](games/zombicide-black-plague.md) 暂停。[铁誓 Ironsworn](games/ironsworn.md) M0 引擎、M1 界面、M2 作者内容（私人 vault）、M3 建角向导完成；M4 剧本（CPU GM，ink）第 1 步引擎+故事标签完成。
 
 ## 7. 决定记录
 

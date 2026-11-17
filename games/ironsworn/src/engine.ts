@@ -1,5 +1,6 @@
 import { need, RuleError, rollDie, type CampaignEngine } from "@boardroom/core";
-import type { Atom } from "./effects";
+import { atomsOf, parseEffect, type Atom, type Effect } from "./effects";
+import { stepStory, type StoryChoice, type StoryLine } from "./story";
 import {
   DEBILITIES,
   METERS,
@@ -99,8 +100,43 @@ export type Entry =
   | { k: "oracle"; table: string; name: Text; roll: number; text: Text }
   | { k: "ask"; odds: Odds; roll: number; yes: boolean; match: boolean }
   | { k: "truth"; id: string; name: Text; text: Text; seed: Text; roll?: number }
+  | { k: "story"; story: string; text: string; scene?: boolean }
+  | { k: "storyChoice"; story: string; text: string }
+  | { k: "roster"; item: RosterItem }
   /** Rules prompts the player should act on: make Face a Setback, trade supply, Face Death… */
   | { k: "prompt"; key: "setback" | "outOfSupply" | "zeroHealth" | "zeroSpirit" | "zeroSupply"; amount?: number };
+
+/** One line of the scenario page as shown: plain text, a scene title, or an oracle result rolled by #oracle. */
+export type PageLine = { k: "line"; text: string } | { k: "scene"; text: string } | { k: "oracle"; table: string; name: Text; roll: number; text: Text };
+
+/** A choice the story offers; `move` means it is taken by rolling that move first (spec §6 剧本). */
+export interface StoryOption {
+  text: string;
+  move?: string;
+  stat?: RollStat;
+}
+
+/** The running scenario (spec §6 剧本). Absent when none is being played. */
+export interface StoryRun {
+  id: string;
+  /** ink's saved state (JSON text). */
+  ink: string;
+  /** The track #vow made, which #milestone marks. */
+  vow?: string;
+  page: PageLine[];
+  choices: StoryOption[];
+  /** #fx consequences waiting for the player's input (effect source text). */
+  fx: string[];
+  /** The story has reached an end. */
+  over: boolean;
+}
+
+/** People, places and clues the story has named (spec §6 剧本). */
+export interface RosterItem {
+  k: "npc" | "place" | "clue";
+  name: string;
+  note: string;
+}
 
 export interface State {
   rng: number;
@@ -112,6 +148,9 @@ export interface State {
   bonus?: number;
   /** The world truths chosen at character creation: truth id → row index. Absent until the first is chosen. */
   truths?: Record<string, number>;
+  story?: StoryRun;
+  /** Absent until a story names someone. */
+  roster?: RosterItem[];
 }
 
 export type Dice = { d6?: number; c1?: number; c2?: number };
@@ -144,7 +183,15 @@ export type Action =
   | { t: "oracle"; table: string; dice?: number }
   /** Picks a world truth's row, or rolls d100 for it when `row` is left out. */
   | { t: "truth"; truth: string; row?: number; dice?: number }
-  | { t: "ask"; odds: Odds; dice?: number };
+  | { t: "ask"; odds: Odds; dice?: number }
+  /** Starts a scenario from the pack. */
+  | { t: "storyStart"; story: string }
+  /** Takes a story choice. One with a move needs that move rolled first; the roll's result goes to the story and ends the roll. */
+  | { t: "storyChoose"; index: number }
+  /** Applies (or, with no atoms, dismisses) a waiting #fx consequence, resolved like a move's (spec §3). */
+  | { t: "storyFx"; index: number; atoms: Atom[]; amounts?: number[]; track?: string; asset?: string }
+  /** Leaves the scenario (finished or not). Its vow, tracks and roster stay. */
+  | { t: "storyEnd" };
 
 export type Event = Entry;
 
@@ -216,6 +263,26 @@ function die(s: State, sides: number, given: number | undefined): number {
   return given;
 }
 
+/** A story #fx that needs no input: no choice, no "?", nothing that needs a roll or a picked track or companion. */
+function autoFx(e: Effect): boolean {
+  if (e.k === "choose") return false;
+  if (e.k === "all") return e.items.every(autoFx);
+  switch (e.k) {
+    case "meter":
+      return typeof e.delta === "number";
+    case "xp":
+      return typeof e.delta === "number";
+    case "progress":
+    case "boxes":
+    case "harm":
+    case "recommit":
+    case "companion":
+      return false;
+    default:
+      return true;
+  }
+}
+
 // ---------- engine ----------
 
 export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Event> {
@@ -283,6 +350,182 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
         if (c.momentum > momentumMax(c)) {
           log({ k: "meter", meter: "momentum", from: c.momentum, to: momentumMax(c) });
           c.momentum = momentumMax(c);
+        }
+      };
+
+      /** Applies consequence atoms (spec §3): `amounts` answer the "?" atoms in order; `track` is the progress track they mark. */
+      const applyAtoms = (atoms: Atom[], amounts: number[], track: string | undefined, asset: string | undefined) => {
+      let ask = 0;
+      const nextAmount = () => {
+        const v = amounts[ask++];
+        need(v !== undefined && Number.isInteger(v) && v >= 0 && v <= 10, "err.amount");
+        return v;
+      };
+      let usedTrack: string | undefined;
+      const progressTrack = () => {
+        const t = findTrack(track ?? s.pending?.track);
+        usedTrack = t.id;
+        return t;
+      };
+      const resolved: number[] = [];
+                for (const a of atoms) {
+        switch (a.k) {
+          case "meter": {
+            const n = a.delta === "ask" ? nextAmount() : a.delta === "-ask" ? -nextAmount() : a.delta;
+            if (typeof a.delta === "string") resolved.push(Math.abs(n));
+            if (a.meter === "momentum") momentum(n);
+            else meter(a.meter, n);
+            break;
+          }
+          case "xp": {
+            let n: number;
+            if (typeof a.delta === "number") n = a.delta;
+            else {
+              const t = progressTrack();
+              n = XP_FOR_RANK[t.rank] - (a.delta === "rank-1" ? 1 : 0);
+            }
+            c.xpEarned = clamp(c.xpEarned + n, 0, 30);
+            break;
+          }
+          case "initiative":
+            c.initiative = a.on;
+            break;
+          case "debility":
+            debility(a.id, a.on);
+            break;
+          case "progress": {
+            const t = progressTrack();
+            const times = a.times === "harm" ? (s.pending?.harm ?? 1) : a.times;
+            markTrack(t, RANK_TICKS[t.rank] * times);
+            break;
+          }
+          case "boxes":
+            markTrack(progressTrack(), a.n * 4);
+            break;
+          case "bond":
+            c.bonds = clamp(c.bonds + a.n, 0, TRACK_TICKS);
+            break;
+          case "harm":
+            need(s.pending, "err.noRoll");
+            s.pending.harm += a.n;
+            break;
+          case "next":
+            s.bonus = (s.bonus ?? 0) + a.n;
+            break;
+          case "recommit": {
+            const t = progressTrack();
+            need(t.status === "active", "err.trackClosed");
+            const from = t.ticks;
+            t.ticks = Math.min(Math.floor(t.ticks / 4), 1) * 4;
+            t.rank = RANKS[Math.min(RANKS.indexOf(t.rank) + 1, RANKS.length - 1)] as Rank;
+            log({ k: "track", track: { ...t }, change: "mark", from });
+            break;
+          }
+          case "companion": {
+            const owned = c.assets.filter((x) => x.health !== undefined);
+            const target = asset ? owned.find((x) => x.id === asset) : owned.length === 1 ? owned[0] : undefined;
+            need(target, "err.noCompanion");
+            const n = a.delta === "ask" ? nextAmount() : a.delta === "-ask" ? -nextAmount() : a.delta;
+            if (typeof a.delta === "string") resolved.push(Math.abs(n));
+            const max = pack.assets.find((x) => x.id === target.id)?.health ?? 5;
+            target.health = clamp((target.health as number) + n, 0, max);
+            break;
+          }
+          case "note":
+          case "move":
+          case "oracle":
+            // Pointers for the UI ("next: Pay the Price"); nothing changes in the state.
+            break;
+        }
+      }
+        return { resolved, usedTrack };
+      };
+
+      /** Runs the story one step and acts on what it says: lines to the page and journal, tags to the state. */
+      const storyStep = (json: string, from: { state: string } | { seed: number }, choose?: { index: number; outcome?: string; match?: boolean }) => {
+        const run = s.story as StoryRun;
+        let out: { state: string; lines: StoryLine[]; choices: StoryChoice[] };
+        try {
+          out = stepStory(json, from, choose);
+        } catch (e) {
+          throw new RuleError("err.storyBroken", { message: e instanceof Error ? e.message : String(e) });
+        }
+        run.ink = out.state;
+        run.page = [];
+        for (const line of out.lines) {
+          const scene = line.tags.find((t) => t.k === "scene");
+          if (scene) {
+            run.page.push({ k: "scene", text: scene.v });
+            log({ k: "story", story: run.id, text: scene.v, scene: true });
+          }
+          if (line.text) {
+            run.page.push({ k: "line", text: line.text });
+            log({ k: "story", story: run.id, text: line.text });
+          }
+          for (const tag of line.tags) storyTag(run, tag.k, tag.v);
+        }
+        run.choices = out.choices.map((c) => {
+          const o: StoryOption = { text: c.text };
+          const mv = c.tags.find((t) => t.k === "move")?.v;
+          const st = c.tags.find((t) => t.k === "stat")?.v;
+          if (mv) o.move = mv;
+          if (st) o.stat = st as RollStat;
+          return o;
+        });
+        run.over = out.choices.length === 0;
+      };
+      const storyTag = (run: StoryRun, k: string, v: string) => {
+        const [name = "", rest = ""] = v.split("/").map((x) => x.trim());
+        switch (k) {
+          case "fx": {
+            const e = parseEffect(v);
+            if (!e) break;
+            if (autoFx(e)) {
+              const atoms = atomsOf(e);
+              const { resolved } = applyAtoms(atoms, [], run.vow, undefined);
+              log({ k: "effect", atoms, amounts: resolved });
+            } else run.fx.push(v);
+            break;
+          }
+          case "vow":
+          case "foe": {
+            need(RANKS.includes(rest as Rank) && name, "err.storyTag", { tag: `#${k}: ${v}` });
+            const t: Track = { id: `t${s.nextTrack++}`, kind: k === "vow" ? "vow" : "combat", name, rank: rest as Rank, ticks: 0, status: "active" };
+            s.tracks.push(t);
+            log({ k: "track", track: { ...t }, change: "new" });
+            if (k === "vow") run.vow = t.id;
+            break;
+          }
+          case "milestone": {
+            const t = s.tracks.find((x) => x.id === run.vow && x.status === "active");
+            if (t) markTrack(t, RANK_TICKS[t.rank]);
+            break;
+          }
+          case "npc":
+          case "place":
+          case "clue": {
+            const item: RosterItem = { k, name: k === "clue" ? v : name, note: k === "clue" ? "" : rest };
+            if (!item.name) break;
+            const list = s.roster ?? [];
+            const old = list.findIndex((x) => x.k === item.k && x.name === item.name);
+            if (old >= 0) {
+              if (!item.note || list[old]?.note === item.note) break;
+              list[old] = item;
+            } else list.push(item);
+            s.roster = list;
+            log({ k: "roster", item });
+            break;
+          }
+          case "oracle": {
+            const o = oracles.get(v);
+            need(o, "err.unknownOracle", { id: v });
+            const n = rollDie(s, o.sides);
+            const row = o.rows.find((r) => n >= r.from && n <= r.to);
+            need(row, "err.unknownOracle", { id: v });
+            run.page.push({ k: "oracle", table: o.id, name: o.name, roll: n, text: row.text });
+            log({ k: "oracle", table: o.id, name: o.name, roll: n, text: row.text });
+            break;
+          }
         }
       };
 
@@ -359,90 +602,8 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           const amounts = action.amounts ?? [];
           if (action.source) need(!!s.pending && !(s.pending.used ?? []).includes(action.source), "err.applied");
           if (action.atoms.some((a) => a.k === "harm")) need(!s.pending?.resolved, "err.applied");
-          let ask = 0;
-          const nextAmount = () => {
-            const v = amounts[ask++];
-            need(v !== undefined && Number.isInteger(v) && v >= 0 && v <= 10, "err.amount");
-            return v;
-          };
-          let usedTrack: string | undefined;
-          const progressTrack = () => {
-            const t = findTrack(action.track ?? s.pending?.track);
-            usedTrack = t.id;
-            return t;
-          };
-          const resolved: number[] = [];
           const harmOnly = action.atoms.length > 0 && action.atoms.every((a) => a.k === "harm");
-          for (const a of action.atoms) {
-            switch (a.k) {
-              case "meter": {
-                const n = a.delta === "ask" ? nextAmount() : a.delta === "-ask" ? -nextAmount() : a.delta;
-                if (typeof a.delta === "string") resolved.push(Math.abs(n));
-                if (a.meter === "momentum") momentum(n);
-                else meter(a.meter, n);
-                break;
-              }
-              case "xp": {
-                let n: number;
-                if (typeof a.delta === "number") n = a.delta;
-                else {
-                  const t = progressTrack();
-                  n = XP_FOR_RANK[t.rank] - (a.delta === "rank-1" ? 1 : 0);
-                }
-                c.xpEarned = clamp(c.xpEarned + n, 0, 30);
-                break;
-              }
-              case "initiative":
-                c.initiative = a.on;
-                break;
-              case "debility":
-                debility(a.id, a.on);
-                break;
-              case "progress": {
-                const t = progressTrack();
-                const times = a.times === "harm" ? (s.pending?.harm ?? 1) : a.times;
-                markTrack(t, RANK_TICKS[t.rank] * times);
-                break;
-              }
-              case "boxes":
-                markTrack(progressTrack(), a.n * 4);
-                break;
-              case "bond":
-                c.bonds = clamp(c.bonds + a.n, 0, TRACK_TICKS);
-                break;
-              case "harm":
-                need(s.pending, "err.noRoll");
-                s.pending.harm += a.n;
-                break;
-              case "next":
-                s.bonus = (s.bonus ?? 0) + a.n;
-                break;
-              case "recommit": {
-                const t = progressTrack();
-                need(t.status === "active", "err.trackClosed");
-                const from = t.ticks;
-                t.ticks = Math.min(Math.floor(t.ticks / 4), 1) * 4;
-                t.rank = RANKS[Math.min(RANKS.indexOf(t.rank) + 1, RANKS.length - 1)] as Rank;
-                log({ k: "track", track: { ...t }, change: "mark", from });
-                break;
-              }
-              case "companion": {
-                const owned = c.assets.filter((x) => x.health !== undefined);
-                const target = action.asset ? owned.find((x) => x.id === action.asset) : owned.length === 1 ? owned[0] : undefined;
-                need(target, "err.noCompanion");
-                const n = a.delta === "ask" ? nextAmount() : a.delta === "-ask" ? -nextAmount() : a.delta;
-                if (typeof a.delta === "string") resolved.push(Math.abs(n));
-                const max = pack.assets.find((x) => x.id === target.id)?.health ?? 5;
-                target.health = clamp((target.health as number) + n, 0, max);
-                break;
-              }
-              case "note":
-              case "move":
-              case "oracle":
-                // Pointers for the UI ("next: Pay the Price"); nothing changes in the state.
-                break;
-            }
-          }
+          const { resolved, usedTrack } = applyAtoms(action.atoms, action.amounts ?? [], action.track, action.asset);
           // Taking a consequence settles the roll (raising harm first doesn't).
           // An asset ability is taken on its own and doesn't settle the move's result.
           if (s.pending && action.source) s.pending.used = [...(s.pending.used ?? []), action.source];
@@ -601,6 +762,55 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           log({ k: "ask", odds: action.odds, roll: n, yes: n >= ODDS[action.odds], match: n === 100 || n % 11 === 0 });
           break;
         }
+
+        case "storyStart": {
+          need(!s.story, "err.storyRunning");
+          const def = pack.stories.find((x) => x.id === action.story);
+          need(def, "err.unknownStory", { id: action.story });
+          const seed = rollDie(s, 1000000);
+          s.story = { id: def.id, ink: "", page: [], choices: [], fx: [], over: false };
+          storyStep(def.json, { seed });
+          break;
+        }
+
+        case "storyChoose": {
+          const run = s.story;
+          need(run && !run.over, "err.noStory");
+          need(!run.fx.length, "err.storyFx");
+          const ch = run.choices[action.index];
+          need(Number.isInteger(action.index) && ch, "err.storyChoice");
+          let outcome: string | undefined;
+          let match: boolean | undefined;
+          if (ch.move) {
+            need(s.pending && s.pending.move === ch.move, "err.storyRoll", { move: getMove(ch.move).name.zh });
+            outcome = s.pending.outcome;
+            match = s.pending.match;
+            s.pending = null;
+          }
+          log({ k: "storyChoice", story: run.id, text: ch.text });
+          const def = pack.stories.find((x) => x.id === run.id);
+          need(def, "err.unknownStory", { id: run.id });
+          storyStep(def.json, { state: run.ink }, { index: action.index, outcome, match });
+          break;
+        }
+
+        case "storyFx": {
+          const run = s.story;
+          need(run, "err.noStory");
+          const src = run.fx[action.index];
+          need(Number.isInteger(action.index) && src !== undefined, "err.storyChoice");
+          if (action.atoms.length) {
+            const { resolved, usedTrack } = applyAtoms(action.atoms, action.amounts ?? [], action.track ?? run.vow, action.asset);
+            log({ k: "effect", atoms: action.atoms, amounts: resolved, track: usedTrack });
+          }
+          run.fx.splice(action.index, 1);
+          break;
+        }
+
+        case "storyEnd":
+          need(s.story, "err.noStory");
+          delete s.story;
+          break;
 
         default:
           throw new RuleError("err.unknownAction");

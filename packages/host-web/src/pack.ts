@@ -22,7 +22,7 @@ export interface PackInfo {
   bytes: number;
 }
 
-const TYPES: Record<string, string> = { md: "text/markdown", json: "application/json", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml" };
+const TYPES: Record<string, string> = { md: "text/markdown", ink: "text/plain", json: "application/json", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml" };
 export const typeOf = (path: string) => TYPES[path.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
 
 export class PackError extends Error {}
@@ -73,10 +73,10 @@ export function readZip(data: Uint8Array): Pack {
   return { game, files };
 }
 
-/** The markdown notes of a pack, for the game's parser. */
+/** The text files of a pack (markdown notes and ink scripts), for the game's parser. */
 export function notesOf(pack: Pack): { path: string; text: string }[] {
   const dec = new TextDecoder();
-  return [...pack.files].filter(([path]) => path.endsWith(".md")).map(([path, f]) => ({ path, text: dec.decode(f.data) }));
+  return [...pack.files].filter(([path]) => path.endsWith(".md") || path.endsWith(".ink")).map(([path, f]) => ({ path, text: dec.decode(f.data) }));
 }
 
 /** Checks the pack with the game's own parser, then replaces any earlier pack for that game, all or nothing. */

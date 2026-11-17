@@ -11,7 +11,7 @@ export function fixtureNotes(): { path: string; text: string }[] {
     for (const f of readdirSync(dir)) {
       const full = join(dir, f);
       if (statSync(full).isDirectory()) walk(full);
-      else if (f.endsWith(".md")) out.push({ path: relative(FIXTURES, full), text: readFileSync(full, "utf8") });
+      else if (f.endsWith(".md") || f.endsWith(".ink")) out.push({ path: relative(FIXTURES, full), text: readFileSync(full, "utf8") });
     }
   };
   walk(FIXTURES);
