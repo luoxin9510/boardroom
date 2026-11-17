@@ -250,7 +250,7 @@ export function parseContent(notes: Raw[]): ContentPack {
               throw at(`#fx: ${e instanceof Error ? e.message : String(e)}`);
             }
           }
-          if ((tag.k === "vow" || tag.k === "foe") && !RANKS.includes(tag.v.split("/")[1]?.trim() as Rank)) throw at(`#${tag.k}: name / rank — the rank must be one of ${RANKS.join(", ")}`);
+          if ((tag.k === "vow" || tag.k === "journey" || tag.k === "foe") && !RANKS.includes(tag.v.split("/")[1]?.trim() as Rank)) throw at(`#${tag.k}: name / rank — the rank must be one of ${RANKS.join(", ")}`);
           if (tag.k === "stat" && ![...STATS, ...METERS].includes(tag.v as never)) throw at(`#stat:${tag.v} is not a stat`);
         }
       });

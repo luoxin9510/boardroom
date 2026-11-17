@@ -499,9 +499,10 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
             break;
           }
           case "vow":
+          case "journey":
           case "foe": {
             need(RANKS.includes(rest as Rank) && name, "err.storyTag", { tag: `#${k}: ${v}` });
-            const t: Track = { id: `t${s.nextTrack++}`, kind: k === "vow" ? "vow" : "combat", name, rank: rest as Rank, ticks: 0, status: "active" };
+            const t: Track = { id: `t${s.nextTrack++}`, kind: k === "vow" ? "vow" : k === "journey" ? "journey" : "combat", name, rank: rest as Rank, ticks: 0, status: "active" };
             s.tracks.push(t);
             log({ k: "track", track: { ...t }, change: "new" });
             if (k === "vow") run.vow = t.id;
