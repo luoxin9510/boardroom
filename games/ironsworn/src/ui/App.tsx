@@ -394,7 +394,6 @@ function CampaignView(props: {
             state={state}
             pack={props.pack}
             act={props.act}
-            journal={c.journal}
             rollFor={(index, ch) => {
               setStoryRoll({ index, stat: ch.stat });
               setMove(ch.move ?? null);
@@ -432,7 +431,8 @@ function CampaignView(props: {
           openRules={props.openRules}
           startStat={storyRoll?.stat}
           onStory={
-            storyRoll && state.story?.choices[storyRoll.index]?.move === moveDef.id
+            // A roll left over from before these choices can't answer them: the sheet offers "done" and a new roll instead.
+            storyRoll && state.story?.choices[storyRoll.index]?.move === moveDef.id && !state.story.staleRoll
               ? () => {
                   if (props.act({ t: "storyChoose", index: storyRoll.index })) {
                     setMove(null);

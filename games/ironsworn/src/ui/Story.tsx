@@ -1,5 +1,5 @@
 import { useLang } from "@boardroom/ui";
-import type { Action, Entry, RosterItem, State, StoryOption } from "../engine";
+import type { Action, RosterItem, State, StoryOption } from "../engine";
 import type { ContentPack } from "../types";
 import { Banner } from "./art";
 import { Consequence } from "./Consequence";
@@ -12,7 +12,6 @@ export function StoryTab(props: {
   state: State;
   pack: ContentPack;
   act: Act;
-  journal: readonly Entry[];
   /** A choice with a move: open that move's sheet; the sheet sends the roll back to the story. */
   rollFor: (index: number, choice: StoryOption) => void;
   openMove: (id: string) => void;
@@ -22,7 +21,6 @@ export function StoryTab(props: {
   const run = props.state.story;
   const def = run && props.pack.stories.find((x) => x.id === run.id);
   const moveName = (id: string) => pick(props.pack.moves.find((m) => m.id === id)?.name, lang) || id;
-  const lastChoice = [...props.journal].reverse().find((e) => e.k === "storyChoice" || e.k === "story");
   return (
     <div className="iw-tab" data-testid="tab-story">
       <Banner name="故事" />
@@ -42,7 +40,7 @@ export function StoryTab(props: {
       {run && (
         <>
           {def && <div className="iw-muted iw-small">{pick(def.name, lang)}</div>}
-          {lastChoice?.k === "storyChoice" && <p className="iw-story-chosen">▸ {lastChoice.text}</p>}
+          {run.chose && <p className="iw-story-chosen">▸ {run.chose}</p>}
           <div className="iw-story-page" data-testid="story-page">
             {run.page.map((l, i) =>
               l.k === "scene" ? (
@@ -96,7 +94,7 @@ export function StoryTab(props: {
             </div>
           )}
           {run.over && <p className="iw-story-end">{t("story.over")}</p>}
-          <button className={`br-btn ${run.over ? "is-primary" : "is-quiet"} is-block`} onClick={() => props.act({ t: "storyEnd" })} data-testid="story-end">
+          <button className={`br-btn ${run.over ? "is-primary" : "is-quiet"} is-block`} disabled={run.fx.length > 0} onClick={() => props.act({ t: "storyEnd" })} data-testid="story-end">
             {t(run.over ? "story.finish" : "story.leave")}
           </button>
         </>

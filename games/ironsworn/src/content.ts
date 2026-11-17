@@ -1,6 +1,6 @@
 import { ContentError, parseNote, type Note } from "@boardroom/core";
 import { atomsOf, EffectError, parseEffect } from "./effects";
-import { compileStory, parseTag, type StoryDef } from "./story";
+import { compileStory, parseTag, stripComments, type StoryDef } from "./story";
 import {
   METERS,
   MOVE_CATEGORIES,
@@ -232,9 +232,9 @@ export function parseContent(notes: Raw[]): ContentPack {
   // Tags in scenarios name moves, oracles and consequences: check them like the notes' (line numbers are the ink file's).
   for (const st of pack.stories) {
     const folder = st.file.split("/").slice(0, -1).join("/");
-    for (const r of notes.filter((x) => x.path.startsWith(`${folder}/`) && x.path.endsWith(".ink"))) {
-      r.text.split("\n").forEach((l, i) => {
-        for (const m of l.matchAll(/#\s*([a-z]+)\s*:([^#\n\]}]*)/gi)) {
+    for (const r of notes.filter((x) => x.path.startsWith(`${folder}/`) && x.path.endsWith(".ink") && !x.path.slice(folder.length + 1).includes("/"))) {
+      stripComments(r.text).split("\n").forEach((l, i) => {
+        for (const m of l.matchAll(/(?<!\\)#\s*([a-z]+)\s*:([^#\n\]}]*)/gi)) {
           const tag = parseTag(`${m[1]}:${(m[2] ?? "").replace(/\\(.)/g, "$1")}`);
           const at = (msg: string) => new ContentError(r.path, i + 1, msg);
           if (tag.k === "move" && !moveIds.has(tag.v)) throw at(`#move:${tag.v} — there is no move with that id`);

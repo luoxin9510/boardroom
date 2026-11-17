@@ -129,6 +129,10 @@ export interface StoryRun {
   fx: string[];
   /** The story has reached an end. */
   over: boolean;
+  /** The last choice taken, shown above the page. */
+  chose?: string;
+  /** A roll was already waiting when these choices appeared: it can't answer them (roll again). */
+  staleRoll?: boolean;
 }
 
 /** People, places and clues the story has named (spec §6 剧本). */
@@ -272,6 +276,10 @@ function autoFx(e: Effect): boolean {
       return typeof e.delta === "number";
     case "xp":
       return typeof e.delta === "number";
+    // Pointers and notes are for the player to see: they wait on the page as buttons.
+    case "move":
+    case "oracle":
+    case "note":
     case "progress":
     case "boxes":
     case "harm":
@@ -282,6 +290,7 @@ function autoFx(e: Effect): boolean {
       return true;
   }
 }
+
 
 // ---------- engine ----------
 
@@ -473,6 +482,8 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           return o;
         });
         run.over = out.choices.length === 0;
+        if (s.pending) run.staleRoll = true;
+        else delete run.staleRoll;
       };
       const storyTag = (run: StoryRun, k: string, v: string) => {
         const [name = "", rest = ""] = v.split("/").map((x) => x.trim());
@@ -544,6 +555,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           break;
 
         case "roll": {
+          if (s.story) delete s.story.staleRoll;
           const m = getMove(action.move);
           need(m.roll === "action", "err.notActionRoll");
           let stat = action.stat;
@@ -569,6 +581,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
         }
 
         case "progressRoll": {
+          if (s.story) delete s.story.staleRoll;
           const m = getMove(action.move);
           need(m.roll === "progress", "err.notProgressRoll");
           let score: number;
@@ -782,12 +795,13 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
           let outcome: string | undefined;
           let match: boolean | undefined;
           if (ch.move) {
-            need(s.pending && s.pending.move === ch.move, "err.storyRoll", { move: getMove(ch.move).name.zh });
+            need(s.pending && s.pending.move === ch.move && !run.staleRoll, "err.storyRoll", { move: getMove(ch.move).name.zh });
             outcome = s.pending.outcome;
             match = s.pending.match;
             s.pending = null;
           }
           log({ k: "storyChoice", story: run.id, text: ch.text });
+          run.chose = ch.text;
           const def = pack.stories.find((x) => x.id === run.id);
           need(def, "err.unknownStory", { id: run.id });
           storyStep(def.json, { state: run.ink }, { index: action.index, outcome, match });
@@ -809,6 +823,7 @@ export function makeEngine(pack: ContentPack): CampaignEngine<State, Action, Eve
 
         case "storyEnd":
           need(s.story, "err.noStory");
+          need(!s.story.fx.length, "err.storyFx");
           delete s.story;
           break;
 

@@ -34,14 +34,17 @@ export function compileStory(folder: string, main: string, files: Map<string, st
     },
   };
   const errors: string[] = [];
-  const opts = new CompilerOptions(null, [], false, (msg: string) => errors.push(msg), handler as never);
+  const opts = new CompilerOptions(null, [], false, (msg: string, type: number) => {
+    // ink also reports TODOs (0) and warnings (1); only errors (2) stop the import.
+    if (type === 2) errors.push(msg);
+  }, handler as never);
   let story: InkStory | null = null;
   try {
     story = new Compiler(text, opts).Compile();
   } catch (e) {
     if (!errors.length) errors.push(String(e instanceof Error ? e.message : e));
   }
-  const first = errors.find((m) => /error/i.test(m)) ?? errors[0];
+  const first = errors[0];
   if (!story || first) {
     // "ERROR: 'other.ink' line 12: …" or "ERROR: line 12: …"
     const m = /'([^']+)'\s+line\s+(\d+)/i.exec(first ?? "") ?? /line\s+(\d+)/i.exec(first ?? "");
@@ -51,9 +54,14 @@ export function compileStory(folder: string, main: string, files: Map<string, st
   }
   const json = story.ToJson() as string;
   const declares = story.variablesState.$("outcome") != null;
-  const usesMoves = /#\s*move\s*:/.test([...files.values()].join("\n"));
+  const usesMoves = /(?<!\\)#\s*move\s*:/.test([...files.values()].map(stripComments).join("\n"));
   if (usesMoves && !declares) throw new ContentError(`${folder}/${main}`, 1, 'choices use #move, so the story must declare VAR outcome = ""');
   return { json, takesRolls: declares };
+}
+
+/** ink source without comments, keeping line numbers: line comments and block comments (their newlines kept). */
+export function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " ")).replace(/(^|[^:\\])\/\/.*$/gm, "$1");
 }
 
 /** One tag split into a name and its value: "#fx: momentum+1" → { k: "fx", v: "momentum+1" }. */
@@ -85,10 +93,9 @@ export function stepStory(
   if ("state" in from) s.state.LoadJson(from.state);
   else s.state.storySeed = from.seed % 1000003;
   if (choose) {
-    if (choose.outcome !== undefined && s.variablesState.$("outcome") != null) {
-      s.variablesState.$("outcome", choose.outcome);
-      if (s.variablesState.$("match") != null) s.variablesState.$("match", !!choose.match);
-    }
+    // Every choice sets them: a choice without a roll leaves outcome "" and match false.
+    if (s.variablesState.$("outcome") != null) s.variablesState.$("outcome", choose.outcome ?? "");
+    if (s.variablesState.$("match") != null) s.variablesState.$("match", !!choose.match);
     s.ChooseChoiceIndex(choose.index);
   }
   const lines: StoryLine[] = [];

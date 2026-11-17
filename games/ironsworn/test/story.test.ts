@@ -183,3 +183,41 @@ describe("scenario content errors", () => {
     expect(contentErr([...fixtureNotes(), { path: "剧本/剧本.md", text: note.replace("fog-lighthouse", "x") }])).toMatch(/belongs in 剧本/);
   });
 });
+
+describe("scenario review fixes", () => {
+  const folder = "剧本/雾灯塔";
+  const main = fixtureNotes().find((n) => n.path === `${folder}/main.ink`)?.text ?? "";
+  const withMain = (text: string) => [...fixtureNotes().filter((n) => n.path !== `${folder}/main.ink`), { path: `${folder}/main.ink`, text }];
+
+  it("TODOs, comments and escaped # in ink don't fail the import", () => {
+    const text = main.replace("-> village", "TODO: 再写一个开场\n// #move:nope\n/* #oracle:nope */\n-> village").replace("# fx: momentum+2", "# fx: momentum+2 // 奖励");
+    const p = parseContent(withMain(text));
+    const c = new Campaign(makeEngine(p), "ironsworn", "c", "T", campaign().state);
+    c.act({ t: "storyStart", story: "fog-lighthouse" });
+    c.act({ t: "roll", move: "befriend", stat: "heart", dice: STRONG });
+    const m = c.state.character.momentum;
+    c.act({ t: "storyChoose", index: 0 });
+    expect(c.state.character.momentum).toBe(m + 2);
+  });
+
+  it("a roll left waiting from before the choices appeared doesn't answer them", () => {
+    const c = campaign();
+    c.act({ t: "roll", move: "befriend", stat: "heart", dice: STRONG });
+    c.act({ t: "storyStart", story: "fog-lighthouse" });
+    expect(c.state.story?.staleRoll).toBe(true);
+    expect(errKey(() => c.act({ t: "storyChoose", index: 0 }))).toBe("err.storyRoll");
+    c.act({ t: "endRoll" });
+    c.act({ t: "roll", move: "befriend", stat: "heart", dice: STRONG });
+    c.act({ t: "storyChoose", index: 0 });
+    expect(c.state.story?.chose).toBe("安慰她，问守塔人的事");
+  });
+
+  it("move and oracle pointers in #fx wait on the page; the story can't end over them", () => {
+    const c = new Campaign(makeEngine(parseContent(withMain(main.replace("# fx: spirit-1", "# fx: move:toll")))), "ironsworn", "c", "T", campaign().state);
+    c.act({ t: "storyStart", story: "fog-lighthouse" });
+    c.act({ t: "roll", move: "befriend", stat: "heart", dice: MISS });
+    c.act({ t: "storyChoose", index: 0 });
+    expect(c.state.story?.fx).toEqual(["move:toll"]);
+    expect(errKey(() => c.act({ t: "storyEnd" }))).toBe("err.storyFx");
+  });
+});
