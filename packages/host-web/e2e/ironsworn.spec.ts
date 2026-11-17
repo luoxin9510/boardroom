@@ -319,3 +319,49 @@ test("decoration from the pack: cover, background, tab and move banners", async 
   await expect(page.locator(".iw-banner")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
 });
+
+test("play a scenario: a rolled choice, a waiting consequence, the roster, to the end", async ({ page }) => {
+  await start(page);
+  await page.getByTestId("nav-story").tap();
+  await expect(page.getByTestId("story-fog-lighthouse")).toContainText("有轻微的暴力描写");
+  await page.getByTestId("story-start").tap();
+  await expect(page.getByTestId("story-page")).toContainText("渔妇莉娜拦住你");
+  await expect(page.getByTestId("story-choice-0")).toContainText("掷：结交");
+  // The choice opens its move with the stat the story asked for; the roll goes back to the story.
+  await page.getByTestId("story-choice-0").tap();
+  await expect(page.getByTestId("stat-heart")).toHaveClass(/is-on/);
+  await page.getByTestId("manual-dice").check();
+  for (const [k, v] of Object.entries({ d6: 6, c1: 1, c2: 10 })) await page.getByTestId(`dice-${k}`).fill(String(v));
+  await page.getByTestId("roll").tap();
+  await expect(page.getByTestId("outcome")).toHaveText("弱成功");
+  await page.getByTestId("story-continue").tap();
+  await expect(page.getByTestId("story-page")).toContainText("半夜划船出海");
+  await expect(page.getByTestId("pending")).toHaveCount(0);
+  await page.getByTestId("story-choice-0").tap(); // 出发去灯塔
+  await expect(page.getByTestId("story-page")).toContainText("灯塔的门半开着");
+  // A miss in the tower: the consequence asks how much and waits before the story goes on.
+  await page.getByTestId("story-choice-0").tap();
+  await page.getByTestId("manual-dice").check();
+  for (const [k, v] of Object.entries({ d6: 1, c1: 10, c2: 10 })) await page.getByTestId(`dice-${k}`).fill(String(v));
+  await page.getByTestId("roll").tap();
+  await page.getByTestId("story-continue").tap();
+  await expect(page.getByTestId("story-fx")).toBeVisible();
+  await expect(page.getByTestId("story-choice-0")).toBeDisabled();
+  await page.getByTestId("story-fx-skip-0").tap();
+  await page.getByTestId("story-choice-0").tap(); // 回村子报信
+  await expect(page.getByTestId("tab-story")).toContainText("故事结束了");
+  await page.getByTestId("roster").locator("summary").tap();
+  await expect(page.getByTestId("roster")).toContainText("莉娜");
+  await expect(page.getByTestId("roster")).toContainText("雾灯塔");
+  // It survives a reload and reads as prose in the journal.
+  await page.reload();
+  await page.getByTestId("demo-ironsworn").tap();
+  await page.getByTestId("continue").tap();
+  await expect(page.getByTestId("tab-story")).toContainText("故事结束了");
+  await page.getByTestId("story-end").tap();
+  await expect(page.getByTestId("story-start")).toBeVisible();
+  await page.getByTestId("nav-journal").tap();
+  await expect(page.getByTestId("tab-journal")).toContainText("渔妇莉娜拦住你");
+  const box = await page.locator("body").evaluate((b) => b.scrollWidth - b.clientWidth);
+  expect(box).toBe(0);
+});

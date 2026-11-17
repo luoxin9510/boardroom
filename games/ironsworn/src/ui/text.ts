@@ -84,6 +84,12 @@ export function entryText(e: Entry, t: T, pack: ContentPack, lang: Lang): string
       return t("j.truth", { name: pick(e.name, lang), roll: e.roll ? (lang === "zh" ? `（${e.roll}）` : ` (${e.roll})`) : "", text: pick(e.text, lang) });
     case "prompt":
       return t(`prompt.${e.key}`, { amount: e.amount ?? 0 });
+    case "story":
+      return e.scene ? `【${e.text}】` : e.text;
+    case "storyChoice":
+      return `▸ ${e.text}`;
+    case "roster":
+      return t("j.roster", { kind: t(`roster.${e.item.k}`), name: e.item.name, note: e.item.note ? (lang === "zh" ? `：${e.item.note}` : `: ${e.item.note}`) : "" });
   }
 }
 
@@ -107,7 +113,10 @@ export function journalMarkdown(title: string, entries: readonly Entry[], notes:
   };
   entries.forEach((e, i) => {
     flushNotes(i);
-    lines.push(`- ${entryText(e, t, pack, lang)}`);
+    // The story reads as prose: its lines are paragraphs, scenes headings, choices bold.
+    if (e.k === "story") lines.push("", e.scene ? `## ${e.text}` : e.text, "");
+    else if (e.k === "storyChoice") lines.push("", `**▸ ${e.text}**`, "");
+    else lines.push(`- ${entryText(e, t, pack, lang)}`);
   });
   flushNotes(Number.MAX_SAFE_INTEGER);
   return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`;

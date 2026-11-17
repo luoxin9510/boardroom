@@ -7,6 +7,7 @@ import { makeEngine, newCampaign, PORTRAITS, type Action, type Entry, type State
 import { messages } from "../messages";
 import type { ContentPack } from "../types";
 import { MoveSheet } from "./MoveSheet";
+import { StoryTab } from "./Story";
 import { CharacterTab, JournalTab, MetersBar, MovesTab, OraclesTab, TracksTab, type Portraits } from "./Tabs";
 import { Wizard } from "./Wizard";
 import { artFrom, ArtProvider, Banner, useArt } from "./art";
@@ -24,7 +25,7 @@ const GAME = "ironsworn";
 const SAVE_DIR = "战役/存档";
 const RULES_FOLDER = "规则";
 const TABS = ["character", "moves", "tracks", "oracles", "journal"] as const;
-type Tab = (typeof TABS)[number];
+type Tab = (typeof TABS)[number] | "story";
 
 export function App(props: { host: Host }) {
   const { host } = props;
@@ -352,12 +353,19 @@ function CampaignView(props: {
 }) {
   const { t } = useLang();
   const [wizard, setWizard] = useState(!!props.startWizard);
-  const [tab, setTab] = useState<Tab>("moves");
+  const hasStories = props.pack.stories.length > 0;
+  const tabs: Tab[] = hasStories ? ["story", ...TABS] : [...TABS];
+  const [tab, setTab] = useState<Tab>(props.campaign.state.story ? "story" : "moves");
   const [move, setMove] = useState<string | null>(null);
+  /** The story choice the open move sheet was opened for, with the stat it suggests. */
+  const [storyRoll, setStoryRoll] = useState<{ index: number; stat?: string } | null>(null);
   const [menu, setMenu] = useState(false);
   const c = props.campaign;
   const state = c.state;
-  const openMove = (id: string) => setMove(id);
+  const openMove = (id: string) => {
+    setStoryRoll(null);
+    setMove(id);
+  };
   const moveDef = move ? props.pack.moves.find((m) => m.id === move) : undefined;
   const rollOracle = (id: string) => {
     props.act({ t: "oracle", table: id });
@@ -381,6 +389,19 @@ function CampaignView(props: {
       </header>
       <MetersBar state={state} act={props.act} openRules={props.openRules} />
       <main className={`iw-main${state.pending && !moveDef ? " has-pending" : ""}`}>
+        {tab === "story" && (
+          <StoryTab
+            state={state}
+            pack={props.pack}
+            act={props.act}
+            rollFor={(index, ch) => {
+              setStoryRoll({ index, stat: ch.stat });
+              setMove(ch.move ?? null);
+            }}
+            openMove={openMove}
+            rollOracle={rollOracle}
+          />
+        )}
         {tab === "character" && <CharacterTab state={state} pack={props.pack} act={props.act} openRules={props.openRules} portraits={props.portraits} />}
         {tab === "moves" && <MovesTab pack={props.pack} open={openMove} />}
         {tab === "tracks" && <TracksTab state={state} pack={props.pack} act={props.act} openMove={openMove} />}
@@ -388,13 +409,41 @@ function CampaignView(props: {
         {tab === "journal" && <JournalTab journal={c.journal} notes={props.notes} pack={props.pack} addNote={props.addNote} exportIt={props.exportIt} />}
       </main>
       <nav className="iw-nav">
-        {TABS.map((k) => (
+        {tabs.map((k) => (
           <button key={k} className={`iw-navbtn${tab === k ? " is-on" : ""}`} onClick={() => setTab(k)} data-testid={`nav-${k}`}>
             {t(`nav.${k}`)}
           </button>
         ))}
       </nav>
-      {moveDef && <MoveSheet key={moveDef.id} move={moveDef} state={state} pack={props.pack} act={props.act} onClose={() => setMove(null)} openMove={openMove} rollOracle={rollOracle} openRules={props.openRules} />}
+      {moveDef && (
+        <MoveSheet
+          key={`${moveDef.id}:${storyRoll?.index ?? ""}`}
+          move={moveDef}
+          state={state}
+          pack={props.pack}
+          act={props.act}
+          onClose={() => {
+            setMove(null);
+            setStoryRoll(null);
+          }}
+          openMove={openMove}
+          rollOracle={rollOracle}
+          openRules={props.openRules}
+          startStat={storyRoll?.stat}
+          onStory={
+            // A roll left over from before these choices can't answer them: the sheet offers "done" and a new roll instead.
+            storyRoll && state.story?.choices[storyRoll.index]?.move === moveDef.id && !state.story.staleRoll
+              ? () => {
+                  if (props.act({ t: "storyChoose", index: storyRoll.index })) {
+                    setMove(null);
+                    setStoryRoll(null);
+                    setTab("story");
+                  }
+                }
+              : undefined
+          }
+        />
+      )}
       {wizard && <Wizard state={state} pack={props.pack} act={props.act} onClose={() => setWizard(false)} openMove={openMove} openRules={props.openRules} />}
       {!moveDef && state.pending && (
         <button

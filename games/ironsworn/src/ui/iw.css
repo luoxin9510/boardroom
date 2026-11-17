@@ -158,7 +158,8 @@
 }
 .iw-nav {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   border-top: 1px solid var(--br-line);
   background: var(--br-panel);
   padding-bottom: var(--br-safe-bottom);
@@ -222,7 +223,8 @@
 }
 .iw-stats {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 6px;
 }
 .br-root .iw-stat {
@@ -667,4 +669,60 @@ img.iw-portrait.is-small {
 .iw-new .br-btn {
   flex: none;
   white-space: nowrap;
+}
+
+/* ---- 故事 (scenarios) ---- */
+.iw-story-card {
+  border: 1px solid var(--br-line);
+  border-radius: var(--br-radius);
+  padding: 12px 14px;
+  margin: 10px 0;
+  background: var(--br-panel);
+}
+.iw-story-card h3 {
+  margin: 0 0 4px;
+}
+.iw-story-warning {
+  font-size: 0.9em;
+  color: var(--br-muted);
+}
+.iw-story-page p {
+  line-height: 1.7;
+  margin: 0.5em 0;
+}
+.iw-story-scene {
+  margin: 14px 0 4px;
+  letter-spacing: 0.05em;
+}
+.iw-story-chosen {
+  color: var(--br-muted);
+  font-style: italic;
+}
+.iw-story-fx {
+  border-left: 3px solid var(--br-accent);
+  padding: 4px 0 4px 10px;
+  margin: 10px 0;
+}
+.iw-story-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+}
+.br-root .iw-story-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: left;
+  gap: 2px;
+  padding: 10px 16px;
+  white-space: normal;
+}
+.iw-story-end {
+  text-align: center;
+  color: var(--br-muted);
+}
+.iw-roster {
+  margin-top: 16px;
 }

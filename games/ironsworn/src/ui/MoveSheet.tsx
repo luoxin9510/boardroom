@@ -29,11 +29,15 @@ export function MoveSheet(props: {
   openMove: (id: string) => void;
   rollOracle: (id: string) => void;
   openRules?: (topic: string) => void;
+  /** The stat a story choice asked for (#stat). */
+  startStat?: string;
+  /** Opened for a story choice: once rolled, the roll goes back to the story instead of just ending. */
+  onStory?: () => void;
 }) {
   const { t, lang } = useLang();
   const { move, state } = props;
   const c = state.character;
-  const [stat, setStat] = useState(move.stats[0]);
+  const [stat, setStat] = useState(props.startStat && move.stats.includes(props.startStat as never) ? props.startStat : move.stats[0]);
   const [adds, setAdds] = useState(0);
   const [manual, setManual] = useState(false);
   const [dice, setDice] = useState({ d6: 1, c1: 1, c2: 1 });
@@ -234,16 +238,22 @@ export function MoveSheet(props: {
                 ))}
               </div>
             )}
-            <button
-              className="br-btn is-block"
-              onClick={() => {
-                props.act({ t: "endRoll" });
-                props.onClose();
-              }}
-              data-testid="done"
-            >
-              {t("move.done")}
-            </button>
+            {props.onStory ? (
+              <button className="br-btn is-primary is-block" onClick={props.onStory} data-testid="story-continue">
+                {t("story.continue")}
+              </button>
+            ) : (
+              <button
+                className="br-btn is-block"
+                onClick={() => {
+                  props.act({ t: "endRoll" });
+                  props.onClose();
+                }}
+                data-testid="done"
+              >
+                {t("move.done")}
+              </button>
+            )}
           </div>
         )}
 

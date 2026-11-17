@@ -4,7 +4,7 @@ Play the board games you own on your phone, offline. An installable web app (PWA
 
 Each game is a TypeScript rules engine plus a mobile-first React UI. A game's content (card images, card data, rules) is never in this repo or on the website: you keep it in your own Obsidian vault, pack it into a zip and import it on your phone, where it stays. The repo only ships code and original test cards, which you can play in the app right away.
 
-- Games: **Goblin Mountain** (solo), a 9-card print-and-play game by Roman Flückiger; **Ironsworn** (solo roleplaying, Shawn Tomkin), with dice, oracles, progress tracks and a journal that exports to Obsidian. You need your own copy of the rules and cards; the built-in test content is invented.
+- Games: **Goblin Mountain** (solo), a 9-card print-and-play game by Roman Flückiger; **Ironsworn** (solo roleplaying, Shawn Tomkin), with dice, oracles, progress tracks, a journal that exports to Obsidian, and written scenarios (ink scripts) that act as an offline game master. You need your own copy of the rules and cards; the built-in test content is invented.
 - Design docs (Chinese): [platform PRD](docs/prd.md), [Goblin Mountain (wrapped up)](docs/games/goblin-mountain.md), [Ironsworn](docs/games/ironsworn.md), [Zombicide: Black Plague (paused)](docs/games/zombicide-black-plague.md).
 
 ## On the phone
@@ -16,7 +16,7 @@ Each game is a TypeScript rules engine plus a mobile-first React UI. A game's co
    ```
 3. In the app, **Import content pack** and pick the zip. Re-import after editing the vault; saves are kept.
 
-The vault needs a `boardroom.json` (`{ "game": "goblin-mountain" }`) and the card notes in `卡牌/` (format: [docs/games/goblin-mountain.md](docs/games/goblin-mountain.md) §3). For Ironsworn: `{ "game": "ironsworn", "folders": ["动作", "资产", "先知", "真相", "规则", "头像", "界面"] }` and notes in those folders ([docs/games/ironsworn.md](docs/games/ironsworn.md) §3).
+The vault needs a `boardroom.json` (`{ "game": "goblin-mountain" }`) and the card notes in `卡牌/` (format: [docs/games/goblin-mountain.md](docs/games/goblin-mountain.md) §3). For Ironsworn: `{ "game": "ironsworn", "folders": ["动作", "资产", "先知", "真相", "规则", "头像", "界面", "剧本"] }` and notes in those folders (scenarios: `剧本/<name>/剧本.md` plus `.ink` files) ([docs/games/ironsworn.md](docs/games/ironsworn.md) §3).
 
 ## Layout
 
@@ -27,7 +27,7 @@ The vault needs a `boardroom.json` (`{ "game": "goblin-mountain" }`) and the car
 | `packages/host-web` | The PWA: library screen, content pack import, IndexedDB storage, service worker, manifest |
 | `games/goblin-mountain` | Rules engine, content parser, screen, zh/en messages |
 | `fixtures/goblin-mountain` | Original test cards in the same format as a real vault (also the app's "try with test cards") |
-| `games/ironsworn` | Ironsworn engine (rolls, momentum, progress, oracles), consequence vocabulary, content parser, screens |
+| `games/ironsworn` | Ironsworn engine (rolls, momentum, progress, oracles), consequence vocabulary, content parser, ink scenarios (inkjs), screens |
 | `fixtures/ironsworn` | Original test moves, assets and tables in the vault format |
 | `scripts/pack.mjs` | Vault → content pack zip |
 

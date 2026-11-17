@@ -1,10 +1,13 @@
 import { ContentError, parseNote, type Note } from "@boardroom/core";
 import { atomsOf, EffectError, parseEffect } from "./effects";
+import { compileStory, parseTag, stripComments, type StoryDef } from "./story";
 import {
   METERS,
   MOVE_CATEGORIES,
+  RANKS,
   STATS,
   TRACK_KINDS,
+  type Rank,
   type Asset,
   type ContentPack,
   type Move,
@@ -18,7 +21,7 @@ import {
 } from "./types";
 
 /** The vault folders a content pack is read from (spec §3). */
-export const FOLDERS = { moves: "动作", assets: "资产", oracles: "先知", truths: "真相" } as const;
+export const FOLDERS = { moves: "动作", assets: "资产", oracles: "先知", truths: "真相", stories: "剧本" } as const;
 
 type Raw = { path: string; text: string };
 
@@ -170,12 +173,32 @@ function parseTruth(n: Note): Truth {
 
 const TYPE_OF_FOLDER: Record<string, string> = { [FOLDERS.moves]: "move", [FOLDERS.assets]: "asset", [FOLDERS.oracles]: "oracle", [FOLDERS.truths]: "truth" };
 
+/** 剧本/<name>/剧本.md plus the .ink files beside it. */
+function parseStory(raw: Raw, n: Note, notes: Raw[]): StoryDef {
+  const folder = n.file.split("/").slice(0, -1).join("/");
+  if (folder.split("/")[0] !== FOLDERS.stories || folder.split("/").length !== 2) throw new ContentError(n.file, 1, `a scenario note belongs in ${FOLDERS.stories}/<name>/`);
+  const files = new Map(notes.filter((r) => r.path.endsWith(".ink") && r.path.startsWith(`${folder}/`) && !r.path.slice(folder.length + 1).includes("/")).map((r) => [r.path.slice(folder.length + 1), r.text]));
+  const { json, takesRolls } = compileStory(folder, str(n, "main") || "main.ink", files);
+  return {
+    id: need(n, "id"),
+    name: { zh: need(n, "zh"), en: str(n, "en") },
+    author: str(n, "author"),
+    license: str(n, "license"),
+    source: str(n, "source"),
+    warning: str(n, "warning"),
+    description: raw.text.replace(/\r\n?/g, "\n").replace(/^---\n[\s\S]*?\n---\n?/, "").trim(),
+    json,
+    takesRolls,
+    file: n.file,
+  };
+}
+
 /**
  * Reads every note of a pack and checks cross-references. The frontmatter `type` decides what a note is; inside the
  * 动作/资产/先知/真相 folders a missing or misspelt type is an error rather than a silently dropped note.
  */
 export function parseContent(notes: Raw[]): ContentPack {
-  const pack: ContentPack = { moves: [], assets: [], oracles: [], truths: [] };
+  const pack: ContentPack = { moves: [], assets: [], oracles: [], truths: [], stories: [] };
   for (const raw of notes) {
     if (!raw.path.endsWith(".md")) continue;
     const n = parseNote(raw.path, raw.text);
@@ -186,9 +209,10 @@ export function parseContent(notes: Raw[]): ContentPack {
     else if (type === "asset") pack.assets.push(parseAsset(n));
     else if (type === "oracle") pack.oracles.push(parseOracle(n));
     else if (type === "truth") pack.truths.push(parseTruth(n));
+    else if (type === "story") pack.stories.push(parseStory(raw, n, notes));
   }
   const seen = new Map<string, string>();
-  for (const x of [...pack.moves, ...pack.assets, ...pack.oracles, ...pack.truths]) {
+  for (const x of [...pack.moves, ...pack.assets, ...pack.oracles, ...pack.truths, ...pack.stories]) {
     const prev = seen.get(x.id);
     if (prev) throw new ContentError(x.file, 1, `id "${x.id}" is also used in ${prev}`);
     seen.set(x.id, x.file);
@@ -205,5 +229,32 @@ export function parseContent(notes: Raw[]): ContentPack {
   };
   for (const m of pack.moves) for (const r of Object.values(m.results)) if (r) check(m.file, r.effect);
   for (const a of pack.assets) for (const ab of a.abilities) check(a.file, ab.effect);
+  // Tags in scenarios name moves, oracles and consequences: check them like the notes' (line numbers are the ink file's).
+  for (const st of pack.stories) {
+    const folder = st.file.split("/").slice(0, -1).join("/");
+    for (const r of notes.filter((x) => x.path.startsWith(`${folder}/`) && x.path.endsWith(".ink") && !x.path.slice(folder.length + 1).includes("/"))) {
+      stripComments(r.text).split("\n").forEach((l, i) => {
+        for (const m of l.matchAll(/(?<!\\)#\s*([a-z]+)\s*:([^#\n\]}]*)/gi)) {
+          const tag = parseTag(`${m[1]}:${(m[2] ?? "").replace(/\\(.)/g, "$1")}`);
+          const at = (msg: string) => new ContentError(r.path, i + 1, msg);
+          if (tag.k === "move" && !moveIds.has(tag.v)) throw at(`#move:${tag.v} — there is no move with that id`);
+          if (tag.k === "oracle" && !oracleIds.has(tag.v)) throw at(`#oracle:${tag.v} — there is no oracle table with that id`);
+          if (tag.k === "fx") {
+            try {
+              for (const a of atomsOf(parseEffect(tag.v))) {
+                if (a.k === "move" && !moveIds.has(a.id)) throw at(`move:${a.id} — there is no move with that id`);
+                if (a.k === "oracle" && !oracleIds.has(a.id)) throw at(`oracle:${a.id} — there is no oracle table with that id`);
+              }
+            } catch (e) {
+              if (e instanceof ContentError) throw e;
+              throw at(`#fx: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+          if ((tag.k === "vow" || tag.k === "foe") && !RANKS.includes(tag.v.split("/")[1]?.trim() as Rank)) throw at(`#${tag.k}: name / rank — the rank must be one of ${RANKS.join(", ")}`);
+          if (tag.k === "stat" && ![...STATS, ...METERS].includes(tag.v as never)) throw at(`#stat:${tag.v} is not a stat`);
+        }
+      });
+    }
+  }
   return pack;
 }
